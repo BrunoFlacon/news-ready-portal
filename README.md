@@ -1,76 +1,74 @@
 # News Portal Pro
 
-Create a responsive news-style website for testing API approvals (TikTok, Meta, Google). The site must look professional and production-ready but can use placeholder content. 
+Crie um site responsivo no estilo portal de notícias para testar aprovações de API (TikTok, Meta, Google). O site deve ter aparência profissional e pronta para produção, mas pode utilizar conteúdo de exemplo (*placeholder*).
 
-Purpose:
-Provide a public-facing domain with Terms of Service and Privacy Policy pages required for API verification.
+Objetivo:
+Disponibilizar um domínio público com páginas de Termos de Serviço e Política de Privacidade, requisitos necessários para a verificação de APIs.
 
-Core Pages:
-1. Home page (news portal style):
-- Header with logo (Web Rádio Vitória or generic news brand)
-- Top navigation menu (Home, Política, Tecnologia, Entretenimento, Contato)
-- Featured news section (hero article)
-- Grid of latest news cards
-- Sidebar with trending topics and recent posts
+Páginas Principais:
+1. Página inicial (estilo portal de notícias):
+- Cabeçalho com logotipo (Web Rádio Vitória ou marca de notícias genérica)
+- Menu de navegação superior (Início, Política, Tecnologia, Entretenimento, Contato)
+- Seção de notícias em destaque (artigo principal)
+- Grade de cards com as últimas notícias
+- Barra lateral com tópicos em alta e postagens recentes
 
-2. Article page:
-- Title, author, date
-- Featured image
-- Body text
-- Social share buttons
+2. Página de artigo:
+- Título, autor, data
+- Imagem de destaque
+- Corpo do texto
+- Botões de compartilhamento em redes sociais
 
-3. Privacy Policy page:
-- Full structured legal layout (headings, paragraphs)
-- Generic GDPR/LGPD-compliant text template
+3. Página de Política de Privacidade:
+- Layout jurídico estruturado (títulos, parágrafos)
+- Modelo de texto genérico em conformidade com GDPR/LGPD
 
-4. Terms of Service page:
-- Structured legal content
-- Sections like usage, responsibilities, disclaimers
+4. Página de Termos de Serviço:
+- Conteúdo jurídico estruturado
+- Seções como uso, responsabilidades, isenções de responsabilidade
 
-5. Contact page:
-- Simple form (name, email, message)
+5. Página de contato:
+- Formulário simples (nome, e-mail, mensagem)
 
-Footer (important for API approval):
-- Links: Privacy Policy, Terms of Service, Contact
-- Social media placeholders
-- Copyright notice
+Rodapé (importante para aprovação de API):
+- Links: Política de Privacidade, Termos de Serviço, Contato
+- Espaços reservados para redes sociais
+- Aviso de direitos autorais (copyright)
 
-Technical Requirements:
-- Mobile responsive
-- Fast loading
-- Clean modern UI (glassmorphism or soft minimal design)
-- SEO-friendly structure
-- Public URLs for:
+Requisitos Técnicos:
+- Responsivo para dispositivos móveis
+- Carregamento rápido
+- Interface (UI) limpa e moderna (estilo *glassmorphism* ou minimalismo suave)
+- Estrutura otimizada para SEO
+- URLs públicas para:
   /privacy-policy
   /terms-of-service
 
-Design Preferences:
-- Clean, modern, similar to news portals (G1/UOL style)
-- Dark/light neutral palette
+Preferências de Design:
+- Limpo, moderno, semelhante a portais de notícias (estilo G1/UOL)
+- Paleta de cores neutras (clara ou escura)
 
-No authentication required.
-No backend required beyond static content.
+Não requer autenticação.
+Não requer backend além de conteúdo estático.
 
-Goal:
-Deploy quickly and get a public HTTPS URL usable for OAuth redirect URIs and API verification (TikTok/Meta).
+Meta:
+Publicar rapidamente e obter uma URL HTTPS pública utilizável para URIs de redirecionamento OAuth e verificação de API (TikTok/Meta).
 
-This project was built with [Lovable](https://lovable.dev).
+Este projeto foi criado com o [Lovable](https://lovable.dev).
 
-## Build with Lovable
+## Desenvolva com o Lovable
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/02c8a39c-abe8-461f-9fdd-dafc0c1e59ed).
+Continue desenvolvendo este projeto no [editor do Lovable](https://lovable.dev/projects/02c8a39c-abe8-461f-9fdd-dafc0c1e59ed). - **Lance mais rápido**: descreva o que deseja criar e o Lovable cuida do código.
+- **Mantenha a sincronia**: cada alteração feita no Lovable é enviada (*commit*) diretamente para este repositório.
+- **Propriedade total**: o código é seu. Faça o *push* para a *branch* `main` no GitHub e suas alterações serão sincronizadas de volta com o Lovable, prontas para o seu próximo comando (*prompt*).
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+## Desenvolvimento
 
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Prefere trabalhar localmente? Você precisará do Node.js e do npm — [instale usando o nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
+git clone <url-deste-repositorio>
+cd <nome-do-repositorio>
 npm i
 npm run dev
 ```
