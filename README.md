@@ -1,74 +1,93 @@
-# News Portal Pro
+# Web Rádio Vitória — Portal de Notícias (news-ready-portal)
 
-Crie um site responsivo no estilo portal de notícias para testar aprovações de API (TikTok, Meta, Google). O site deve ter aparência profissional e pronta para produção, mas pode utilizar conteúdo de exemplo (*placeholder*).
+Repositório **único** do projeto Web Rádio Vitória (Tupã–SP · “24 hs Adorando a Deus”).
 
-Objetivo:
-Disponibilizar um domínio público com páginas de Termos de Serviço e Política de Privacidade, requisitos necessários para a verificação de APIs.
+Resultado da **unificação** de dois repositórios:
+- `BrunoFlacon/news-ready-portal` — portal de notícias + páginas legais (para aprovação de APIs TikTok/Meta/Google).
+- `BrunoFlacon/landpagewebradiovitoria` — landing institucional da rádio (design “Celestial Signal”).
 
-Páginas Principais:
-1. Página inicial (estilo portal de notícias):
-- Cabeçalho com logotipo (Web Rádio Vitória ou marca de notícias genérica)
-- Menu de navegação superior (Início, Política, Tecnologia, Entretenimento, Contato)
-- Seção de notícias em destaque (artigo principal)
-- Grade de cards com as últimas notícias
-- Barra lateral com tópicos em alta e postagens recentes
+> 📋 Auditoria e plano de unificação completos: [`AUDITORIA-E-PLANO-UNIFICACAO.md`](./AUDITORIA-E-PLANO-UNIFICACAO.md)
 
-2. Página de artigo:
-- Título, autor, data
-- Imagem de destaque
-- Corpo do texto
-- Botões de compartilhamento em redes sociais
+---
 
-3. Página de Política de Privacidade:
-- Layout jurídico estruturado (títulos, parágrafos)
-- Modelo de texto genérico em conformidade com GDPR/LGPD
+## Funcionalidades
 
-4. Página de Termos de Serviço:
-- Conteúdo jurídico estruturado
-- Seções como uso, responsabilidades, isenções de responsabilidade
+### Landing institucional (`/`)
+- Hero “AO VIVO” com stats (29K seguidores, 24h, Tupã) e visualizador de ondas animado
+- Seções: Sobre (história + valores), Serviços (6 cards), Depoimentos (4 testemunhos)
+- Contato com informações reais e redes sociais da rádio
+- Footer com slogan “24 hs Adorando a Deus”
 
-5. Página de contato:
-- Formulário simples (nome, e-mail, mensagem)
+### Portal de notícias (`/noticias`, `/artigo/:id`)
+- Listagem com hero de destaque, grade de cards e sidebar (“Em Alta” / “Recentes”)
+- **Filtro por categoria** (Política, Tecnologia, Entretenimento)
+- Página de artigo com autor, data e **compartilhamento real** (Facebook, X, LinkedIn, WhatsApp, copiar link)
+- **Título dinâmico** por artigo (SEO)
 
-Rodapé (importante para aprovação de API):
-- Links: Política de Privacidade, Termos de Serviço, Contato
-- Espaços reservados para redes sociais
-- Aviso de direitos autorais (copyright)
+### Páginas legais (requisito para aprovação de APIs)
+- Política de Privacidade (`/privacy-policy`)
+- Termos de Serviço (`/terms-of-service`)
 
-Requisitos Técnicos:
-- Responsivo para dispositivos móveis
-- Carregamento rápido
-- Interface (UI) limpa e moderna (estilo *glassmorphism* ou minimalismo suave)
-- Estrutura otimizada para SEO
-- URLs públicas para:
-  /privacy-policy
-  /terms-of-service
+### Contato (`/contato`)
+- Formulário completo (nome, e-mail, telefone, mensagem)
+- Endereço e redes sociais reais
 
-Preferências de Design:
-- Limpo, moderno, semelhante a portais de notícias (estilo G1/UOL)
-- Paleta de cores neutras (clara ou escura)
+---
 
-Não requer autenticação.
-Não requer backend além de conteúdo estático.
+## Rotas
 
-Meta:
-Publicar rapidamente e obter uma URL HTTPS pública utilizável para URIs de redirecionamento OAuth e verificação de API (TikTok/Meta).
+| Rota | Página |
+|---|---|
+| `/` | Landing institucional da rádio |
+| `/noticias` | Portal de notícias |
+| `/artigo/:id` | Artigo completo |
+| `/contato` | Contato unificado |
+| `/privacy-policy` | Política de Privacidade |
+| `/terms-of-service` | Termos de Serviço |
+| `*` | 404 |
 
-Este projeto foi criado com o [Lovable](https://lovable.dev).
+---
 
-## Desenvolva com o Lovable
+## Stack
 
-Continue desenvolvendo este projeto no [editor do Lovable](https://lovable.dev/projects/02c8a39c-abe8-461f-9fdd-dafc0c1e59ed). - **Lance mais rápido**: descreva o que deseja criar e o Lovable cuida do código.
-- **Mantenha a sincronia**: cada alteração feita no Lovable é enviada (*commit*) diretamente para este repositório.
-- **Propriedade total**: o código é seu. Faça o *push* para a *branch* `main` no GitHub e suas alterações serão sincronizadas de volta com o Lovable, prontas para o seu próximo comando (*prompt*).
+- Vite 5 + React 18 + TypeScript
+- Tailwind CSS 3 + shadcn/ui (Radix)
+- React Router 6 + TanStack Query
+- Vitest (unit) + Playwright (e2e)
+- Fontes: Merriweather / Source Sans 3 (portal) · Playfair Display / Lato (landing)
+
+---
 
 ## Desenvolvimento
 
-Prefere trabalhar localmente? Você precisará do Node.js e do npm — [instale usando o nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
 ```sh
-git clone <url-deste-repositorio>
-cd <nome-do-repositorio>
-npm i
+npm install
 npm run dev
 ```
+
+Build de produção:
+
+```sh
+npm run build
+```
+
+Testes:
+
+```sh
+npm test        # vitest run
+```
+
+---
+
+## Pendências que exigem decisão do cliente
+
+1. **Player de áudio ao vivo** — URL do stream (Icecast/Shoutcast ou mp3) para o botão “Ouvir Agora”.
+2. **Envio real do formulário de contato** — endpoint (Formspree/Resend/WhatsApp API) para substituir o toast simulado.
+3. **Domínio definitivo** — apontar o CNAME/HTTPS público para URIs OAuth.
+4. **Analytics Umami** — definir `VITE_ANALYTICS_ENDPOINT` e `VITE_ANALYTICS_WEBSITE_ID`.
+5. **Google Maps** — incluir seção com mapa (requer `VITE_FRONTEND_FORGE_API_KEY`).
+6. **Arquivar/desativar** o repositório `landpagewebradiovitoria` após a unificação.
+
+---
+
+Este projeto foi criado com o [Lovable](https://lovable.dev) e continua mantido como repositório único para o domínio público e aprovação de APIs.
