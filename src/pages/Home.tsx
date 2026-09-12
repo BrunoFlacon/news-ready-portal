@@ -31,6 +31,12 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import {
+  useRadioPlayer,
+  RadioPlayerBar,
+  ListenNowButton,
+} from "@/components/RadioPlayer";
+import { submitContact } from "@/lib/contact";
 
 // ─── Asset URLs ────────────────────────────────────────────────────────────────
 const HERO_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663537524925/WyaUbNtmjegzP69poquyFv/hero_bg-iKvXxxDN2aszo5gF663RwH.webp";
@@ -170,7 +176,12 @@ function Navbar() {
 }
 
 // ─── Hero Section ──────────────────────────────────────────────────────────────
-function HeroSection() {
+interface HeroSectionProps {
+  streamUrl: string;
+  onListen: () => void;
+}
+
+function HeroSection({ streamUrl, onListen }: HeroSectionProps) {
   const scrollTo = (href: string) => {
     const el = document.querySelector(href);
     if (el) el.scrollIntoView({ behavior: "smooth" });
@@ -252,12 +263,13 @@ function HeroSection() {
 
           {/* CTA Buttons */}
           <div className="flex flex-wrap gap-4">
+            <ListenNowButton streamUrl={streamUrl} onOpen={onListen} />
             <button
               onClick={() => scrollTo("#sobre")}
-              className="flex items-center gap-2 bg-[#c9a227] hover:bg-[#f0c040] text-[#0b1e3d] font-bold px-8 py-4 rounded-full transition-all duration-200 shadow-xl hover:shadow-2xl hover:scale-105"
+              className="flex items-center gap-2 border-2 border-white/40 hover:border-[#c9a227] text-white hover:text-[#c9a227] font-semibold px-8 py-4 rounded-full transition-all duration-200 backdrop-blur-sm"
               style={{ fontFamily: "'Lato', sans-serif" }}
             >
-              <Play className="w-5 h-5" />
+              <ChevronDown className="w-4 h-4" />
               Conheça a Rádio
             </button>
             <a
@@ -675,18 +687,21 @@ function ContactSection() {
   const [form, setForm] = useState({ name: "", email: "", phone: "", message: "" });
   const [sending, setSending] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.email || !form.message) {
       toast.error("Por favor, preencha todos os campos obrigatórios.");
       return;
     }
     setSending(true);
-    setTimeout(() => {
-      setSending(false);
-      toast.success("Mensagem enviada com sucesso! Entraremos em contato em breve.");
+    const result = await submitContact(form);
+    setSending(false);
+    if (result.ok) {
+      toast.success(result.message);
       setForm({ name: "", email: "", phone: "", message: "" });
-    }, 1500);
+    } else {
+      toast.error(result.message);
+    }
   };
 
   return (
@@ -1019,15 +1034,26 @@ function Footer() {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function Home() {
+  const radio = useRadioPlayer();
+
   return (
     <div className="min-h-screen">
       <Navbar />
-      <HeroSection />
+      <HeroSection streamUrl={radio.streamUrl} onListen={radio.openPlayer} />
       <AboutSection />
       <ServicesSection />
       <TestimonialsSection />
       <ContactSection />
       <Footer />
+      <RadioPlayerBar
+        url={radio.streamUrl}
+        open={radio.open}
+        playing={radio.playing}
+        error={radio.error}
+        togglePlay={radio.togglePlay}
+        closePlayer={radio.closePlayer}
+        audioRef={radio.audioRef}
+      />
     </div>
   );
 }

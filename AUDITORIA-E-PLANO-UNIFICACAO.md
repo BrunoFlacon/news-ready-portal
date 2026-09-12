@@ -181,35 +181,45 @@ index.html                           ← corrigido (lang pt-BR, metas, fontes)
 - [x] Documentar este plano
 
 ### Fase 2 — Identidade e SEO
-- [ ] Corrigir `index.html`: `lang="pt-BR"`, título único, description/keywords/OG/Twitter próprios da marca, preconnect para Google Fonts
-- [ ] Adicionar fontes Playfair Display + Lato (e manter Merriweather/Source Sans para o portal)
-- [ ] Portar design tokens e animações da landing para `src/index.css` (wave, pulse, fadeInUp, service-card, section-divider…)
+- [x] Corrigir `index.html`: `lang="pt-BR"`, título único, description/keywords/OG/Twitter próprios da marca, preconnect para Google Fonts
+- [x] Adicionar fontes Playfair Display + Lato (e manter Merriweather/Source Sans para o portal)
+- [x] Portar design tokens e animações da landing para `src/index.css` (wave, pulse, fadeInUp, service-card, section-divider…)
 
 ### Fase 3 — Port da landing
-- [ ] Portar `pages/Home.tsx` (Navbar, Hero, Sobre, Serviços, Depoimentos, Contato, Footer da landing)
-- [ ] Portar `ErrorBoundary.tsx` e `contexts/ThemeContext.tsx`
-- [ ] Registrar rota `/` = Home e mover portal de notícias para `/noticias`
+- [x] Portar `pages/Home.tsx` (Navbar, Hero, Sobre, Serviços, Depoimentos, Contato, Footer da landing)
+- [x] Portar `ErrorBoundary.tsx` e `contexts/ThemeContext.tsx`
+- [x] Registrar rota `/` = Home e mover portal de notícias para `/noticias`
 
 ### Fase 4 — Unificação
-- [ ] `SiteHeader`: logo da marca (ícone rádio), nav global, CTA “Fale Conosco”
-- [ ] `SiteFooter`: unificar redes reais + links legais + slogan + copyright
-- [ ] `Contact.tsx`: formulário completo (nome/e-mail/telefone/mensagem) + infos reais + redes sociais
-- [ ] `ArticlePage`: compartilhamento com URLs reais (Facebook/X/LinkedIn/WhatsApp) + `document.title`
-- [ ] `Index` (notícias): filtro por categoria (chips)
+- [x] `SiteHeader`: logo da marca (ícone rádio), nav global, CTA “Fale Conosco”
+- [x] `SiteFooter`: unificar redes reais + links legais + slogan + copyright
+- [x] `Contact.tsx`: formulário completo (nome/e-mail/telefone/mensagem) + infos reais + redes sociais
+- [x] `ArticlePage`: compartilhamento com URLs reais (Facebook/X/LinkedIn/WhatsApp) + `document.title`
+- [x] `Index` (notícias): filtro por categoria (chips)
 
 ### Fase 5 — Qualidade
-- [ ] Adicionar testes Vitest (render da Home, rotas legais, filtro de categoria)
-- [ ] Atualizar `README.md` com a estrutura unificada
-- [ ] `npm run build` + `npm test` verdes
-- [ ] Commit + push para `main` do `news-ready-portal`
+- [x] Adicionar testes Vitest (render da Home, rotas legais, filtro de categoria)
+- [x] Atualizar `README.md` com a estrutura unificada
+- [x] `npm run build` + `npm test` verdes
+- [x] Commit + push para `main` do `news-ready-portal`
 
-### Fase 6 — Pendências que exigem decisão do cliente
-- [ ] **Player de áudio ao vivo**: URL do stream (Icecast/Shoutcast ou arquivo mp3) para o botão “Ouvir Agora”
-- [ ] **Envio real do formulário de contato**: endpoint (Formspree/resend/WhatsApp API) para substituir o toast simulado
+### Fase 5.1 — Paridade total (2ª rodada) 
+- [x] **Paridade de arquivos**: `client/src` da landing 100% portado (hooks `useComposition`/`useMobile`/`usePersistFn`, `ManusDialog`, `Map`, `const.ts` → `src/lib/oauth.ts`, `shared/const.ts` → `src/lib/constants.ts`, UI extras: `button-group`, `empty`, `field`, `input-group`, `item`, `kbd`, `spinner`)
+- [x] `.env.example` + `.gitignore` protegendo `.env`
+- [x] **Player de áudio ao vivo**: `src/components/RadioPlayer.tsx` + botão “Ouvir Agora” no hero + barra fixa (URL via `VITE_RADIO_STREAM_URL`; estado “Em breve” sem URL)
+- [x] **Envio real do formulário**: `src/lib/contact.ts` (`VITE_CONTACT_ENDPOINT`, POST JSON com timeout; modo demonstração sem endpoint) integrado em Home e Contact
+- [x] **Umami**: `src/lib/analytics.ts` + injeção condicional no `main.tsx`
+- [x] **Google Maps**: mapa portado na página de contato com fallback (link Google Maps) quando `VITE_FRONTEND_FORGE_API_KEY` ausente + `@types/google.maps`
+- [x] Docs: `docs/IDEIAS-DESIGN.md` (design history) + README/auditoria atualizados
+- [x] Testes (19) + `tsc --noEmit` + `npm run build` verdes
+
+### Fase 6 — Pendências que exigem decisão do cliente (valores reais no `.env`)
+- [ ] **URL do stream ao vivo** → `VITE_RADIO_STREAM_URL` (Icecast/Shoutcast ou MP3) libera o botão “Ouvir Agora” (código pronto)
+- [ ] **Endpoint do formulário** → `VITE_CONTACT_ENDPOINT` (Formspree/Resend/WhatsApp API). Sem valor opera em modo demonstração
+- [ ] **Chave do Google Maps** → `VITE_FRONTEND_FORGE_API_KEY` ativa o mapa em `/contato` (fallback pronto)
+- [ ] **Analytics Umami** → `VITE_ANALYTICS_ENDPOINT` + `VITE_ANALYTICS_WEBSITE_ID` (script só é injetado quando preenchidos)
 - [ ] **Apontamento de domínio**: CNAME/domínio definitivo (example.com) para as URIs OAuth
-- [ ] **Analytics Umami**: definir `VITE_ANALYTICS_ENDPOINT` e `VITE_ANALYTICS_WEBSITE_ID`
-- [ ] **Google Maps**: incluir seção com mapa (requer `VITE_FRONTEND_FORGE_API_KEY`)
-- [ ] Depois da unificação, **desativar/arquivar** o repositório `landpagewebradiovitoria` para evitar duplicidade
+- [ ] Após confirmação de paridade, **excluir** o repositório `landpagewebradiovitoria` (requer `gh` CLI ou token com escopo `delete_repo`)
 
 ---
 
