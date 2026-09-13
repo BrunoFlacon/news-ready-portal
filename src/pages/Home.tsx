@@ -1,6 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
 import {
-  Captions,
   Crown,
   Heart,
   Lock,
@@ -10,14 +9,13 @@ import {
   Play,
   Radio,
   Users,
-  Volume2,
-  VolumeX,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { Layout } from "@/components/Layout";
 import { MediaRail } from "@/components/MediaRail";
+import { YouTubePlayer } from "@/components/YouTubePlayer";
 import { Button } from "@/components/ui/button";
 import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
 import { extractPalette, type AmbientPalette } from "@/lib/ambient";
@@ -74,7 +72,6 @@ interface WatchOverlayProps {
   onToggleCc: () => void;
   onShowUi: () => void;
   onHideUi: () => void;
-  onToggleUi: () => void;
   onClose: () => void;
   onEnded: () => void;
   onPremiumRequest: (target: PremiumTarget) => void;
@@ -89,7 +86,6 @@ function WatchOverlay({
   onToggleCc,
   onShowUi,
   onHideUi,
-  onToggleUi,
   onClose,
   onEnded,
   onPremiumRequest,
@@ -98,65 +94,6 @@ function WatchOverlay({
   const transitioning = phase === "transition";
   const next = phase === "transition" ? watch.next : null;
   const vertical = item.orientation === "vertical";
-
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [muted, setMuted] = useState(false);
-  const [volume, setVolume] = useState(0.85);
-
-  // Aplica volume/mudo ao vídeo — inclusive quando o item troca de mídia.
-  useEffect(() => {
-    const video = videoRef.current;
-    if (video) {
-      video.muted = muted;
-      video.volume = volume;
-    }
-  }, [muted, volume, item.id]);
-
-  const toggleMute = () => {
-    if (muted) {
-      // Restaurar o som: se a barra estava no zero, volta a um nível útil.
-      if (volume === 0) {
-        setVolume(0.85);
-      }
-      setMuted(false);
-    } else {
-      setMuted(true);
-    }
-  };
-
-  const mediaBox = vertical ? (
-    // Reels/stories em 9:16: ocupa a altura TODA do banner, bem maior.
-    <div className="relative aspect-[9/16] h-full w-auto overflow-hidden rounded-lg bg-black shadow-2xl">
-      <video
-        key={item.id}
-        ref={videoRef}
-        data-testid="watch-media"
-        src={item.videoUrl}
-        autoPlay
-        controls
-        playsInline
-        muted={muted}
-        onEnded={onEnded}
-        className="h-full w-full object-contain"
-      />
-    </div>
-  ) : (
-    // Vídeos/lives em 16:9: preenchem TODO o banner (object-cover cobre a tela).
-    <div className="h-full w-full overflow-hidden">
-      <video
-        key={item.id}
-        ref={videoRef}
-        data-testid="watch-media"
-        src={item.videoUrl}
-        autoPlay
-        controls
-        playsInline
-        muted={muted}
-        onEnded={onEnded}
-        className="h-full w-full object-cover"
-      />
-    </div>
-  );
 
   return (
     <div
@@ -172,20 +109,22 @@ function WatchOverlay({
           <div className="ambient-blob ambient-blob-2 bottom-[-20%] right-[-10%] h-[80%] w-[70%]" style={{ background: ambient.b }} />
           <div className="ambient-dim" />
 
-          {/* O vídeo preenche o banner inteiro; toque alterna a UI no mobile */}
-          <div
-            className="absolute inset-0 z-10 flex items-center justify-center"
-            onPointerDown={() => {
-              if (vertical) {
-                onToggleUi();
-              }
-            }}
-          >
-            {mediaBox}
+          {/* O vídeo ocupa o banner inteiro com o player estilo YouTube */}
+          <div className="absolute inset-0 z-10 flex items-center justify-center">
+            <YouTubePlayer
+              src={item.videoUrl}
+              poster={item.image}
+              caption={item.caption}
+              orientation={item.orientation}
+              cc={cc}
+              showControls={uiVisible}
+              onToggleCc={onToggleCc}
+              onEnded={onEnded}
+            />
           </div>
 
-          {/* Tarja superior esquerda: AO VIVO sempre visível; demais no hover */}
-          <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-4">
+          {/* Tarja do tipo no canto superior esquerdo (AO VIVO sempre visível) */}
+          <div className="absolute left-4 top-4 z-20">
             {item.kind === "live" ? (
               <span
                 data-testid="watch-live-badge"
@@ -204,104 +143,33 @@ function WatchOverlay({
                 {item.kicker} • {vertical ? "Formato vertical" : "Tela ampla"}
               </span>
             )}
-
-            {/* Controles: mudo, volume, legendas (CC) e fechar */}
-            <div
-              className={cn(
-                "flex items-center gap-2 transition-opacity",
-                uiVisible ? "opacity-100" : "pointer-events-none opacity-0",
-              )}
-            >
-              <button
-                type="button"
-                onClick={toggleMute}
-                aria-label={muted ? "Ativar som do vídeo" : "Silenciar vídeo"}
-                aria-pressed={muted}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
-              >
-                {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-              </button>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={muted ? 0 : volume}
-                onChange={(event) => {
-                  const value = Number(event.target.value);
-                  setVolume(value);
-                  setMuted(value === 0);
-                }}
-                aria-label="Volume do vídeo"
-                className="h-1.5 w-24 cursor-pointer accent-brand lg:w-32"
-              />
-              <span className="hidden w-10 text-center text-[10px] font-bold tabular-nums text-foreground sm:inline">
-                {muted ? 0 : Math.round(volume * 100)}%
-              </span>
-              <button
-                type="button"
-                onClick={onToggleCc}
-                aria-label="Legendas do vídeo"
-                aria-pressed={cc}
-                className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-full transition-colors",
-                  cc ? "bg-brand text-brand-foreground" : "bg-background/85 text-foreground hover:bg-background",
-                )}
-              >
-                <Captions className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Fechar player"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
           </div>
 
-          {/* Legenda (CC) sobre o vídeo, sem tarja preta — sombra dá o contraste */}
-          {cc && (
-            <div
-              data-testid="watch-caption"
-              className="pointer-events-none absolute inset-x-0 bottom-16 z-20 flex justify-center px-4 lg:bottom-24"
-            >
-              <p className="max-w-3xl px-4 py-2 text-center text-sm font-medium leading-relaxed text-white [text-shadow:_0_1px_2px_rgba(0,0,0,0.9),_0_0_10px_rgba(0,0,0,0.6)]">
-                {item.caption}
-              </p>
-            </div>
-          )}
+          {/* Fechar o player (não faz parte do clone YouTube) */}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar player"
+            className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
+          >
+            <X className="h-4 w-4" />
+          </button>
 
-          {/* Painel de informações: título, descrição e "a seguir" (hover/toque; some após 10s) */}
+          {/* Título, descrição e "a seguir" (hover/toque; some após 10s) */}
           <div
             className={cn(
-              "absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-4 pb-3 pt-16 transition-opacity duration-300 lg:px-6",
-              uiVisible ? "opacity-100" : "pointer-events-none opacity-0",
+              "pointer-events-none absolute left-4 top-16 z-20 max-w-2xl transition-opacity duration-300",
+              uiVisible ? "opacity-100" : "opacity-0",
             )}
-            onPointerDown={(event) => {
-              event.stopPropagation();
-              if (vertical) {
-                onToggleUi();
-              }
-            }}
           >
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-              <div className="min-w-0 max-w-2xl">
-                <p className="editorial-kicker">{item.kicker}</p>
-                <h3 className="font-serif text-lg font-bold leading-snug text-overlay-foreground lg:text-2xl">{item.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-overlay-muted">{watchBlurb(item)}</p>
-              </div>
-              {next && (
-                <div className="flex w-fit shrink-0 items-center gap-3 rounded-md bg-black/50 p-2 backdrop-blur-sm">
-                  <img src={next.image} alt="" className="h-12 w-12 flex-shrink-0 rounded object-cover" />
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase text-brand">A seguir</p>
-                    <p className="max-w-40 truncate text-xs font-bold text-white">{next.title}</p>
-                  </div>
-                </div>
-              )}
-            </div>
+            <p className="editorial-kicker text-overlay-foreground [text-shadow:_0_1px_2px_rgba(0,0,0,0.8)]">{item.kicker}</p>
+            <h3 className="mt-1 font-serif text-lg font-bold leading-snug text-overlay-foreground [text-shadow:_0_1px_2px_rgba(0,0,0,0.8)] lg:text-2xl">
+              {item.title}
+            </h3>
+            <p className="mt-1 text-sm leading-relaxed text-overlay-muted [text-shadow:_0_1px_2px_rgba(0,0,0,0.8)]">
+              {watchBlurb(item)}
+            </p>
+            {next && <p className="mt-2 text-xs font-bold text-brand">A seguir: {next.title}</p>}
           </div>
         </>
       )}
@@ -583,7 +451,6 @@ function RadioHero({
           onToggleCc={toggleCc}
           onShowUi={() => setUiVisible(true)}
           onHideUi={() => setUiVisible(false)}
-          onToggleUi={() => setUiVisible((visible) => !visible)}
           onClose={onCloseWatch}
           onEnded={onEnded}
           onPremiumRequest={onPremiumRequest}

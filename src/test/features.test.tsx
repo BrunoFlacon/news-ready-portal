@@ -550,6 +550,99 @@ describe("Home — player imersivo no banner gigante", () => {
       screen.getByRole("link", { name: /Acessar Vitória News/i }),
     ).toBeInTheDocument();
   });
+
+  it("pausa e reproduz o vídeo pelo botão central do player (estilo YouTube)", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
+      }),
+    );
+
+    const playPause = screen.getByRole("button", { name: /Pausar vídeo/i });
+    fireEvent.click(playPause);
+    expect(screen.getByRole("button", { name: /Reproduzir vídeo/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Reproduzir vídeo/i }));
+    expect(screen.getByRole("button", { name: /Pausar vídeo/i })).toBeInTheDocument();
+  });
+
+  it("altera a velocidade de reprodução em ciclo e aplica na mídia", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
+      }),
+    );
+    const media = screen.getByTestId("watch-media") as HTMLVideoElement;
+
+    expect(screen.getByRole("button", { name: /Velocidade de reprodução/i })).toHaveTextContent("1x");
+    fireEvent.click(screen.getByRole("button", { name: /Velocidade de reprodução/i }));
+    expect(screen.getByRole("button", { name: /Velocidade de reprodução/i })).toHaveTextContent("1.25x");
+    expect(media.playbackRate).toBe(1.25);
+  });
+
+  it("abre o menu de qualidade (padrão Auto 1080p) e seleciona 480p", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
+      }),
+    );
+    const qualityButton = screen.getByRole("button", { name: /Qualidade do vídeo/i });
+    expect(qualityButton).toHaveTextContent("Auto (1080p)");
+
+    fireEvent.click(qualityButton);
+    expect(screen.getByTestId("quality-menu")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /480p/i }));
+    expect(screen.getByRole("button", { name: /Qualidade do vídeo/i })).toHaveTextContent("480p");
+  });
+
+  it("arrasta a timeline para buscar (scrub) e mostra a capa como pré-visualização", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
+      }),
+    );
+    const media = screen.getByTestId("watch-media") as HTMLVideoElement;
+    const timeline = screen.getByTestId("player-timeline");
+    vi.spyOn(timeline, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      right: 200,
+      top: 0,
+      bottom: 8,
+      width: 200,
+      height: 8,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    let seeked = 0;
+    Object.defineProperty(media, "duration", { configurable: true, get: () => 100 });
+    Object.defineProperty(media, "currentTime", {
+      configurable: true,
+      get: () => seeked,
+      set: (value: number) => {
+        seeked = value;
+      },
+    });
+
+    fireEvent(timeline, new MouseEvent("pointerdown", { bubbles: true, clientX: 100 }));
+    expect(screen.getByTestId("youtube-player")).toHaveClass("scrubbing");
+
+    fireEvent(window, new MouseEvent("pointerup", { bubbles: true, clientX: 100 }));
+    expect(screen.getByTestId("youtube-player")).not.toHaveClass("scrubbing");
+    expect(seeked).toBeCloseTo(50);
+  });
 });
 
 describe("Home — área premium", () => {
