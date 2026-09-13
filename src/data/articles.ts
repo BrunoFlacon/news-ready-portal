@@ -17,7 +17,7 @@ export const articles: Article[] = [
     category: "Política",
     author: "Ana Beatriz Silva",
     date: "2026-03-26",
-    imageUrl: "https://images.unsplash.com/photo-1504711434969-e33886168d6c?w=800&q=80",
+    imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80",
     body: "O governo federal apresentou nesta terça-feira um ambicioso pacote de investimentos voltado para a infraestrutura digital do país. Com previsão de R$ 12 bilhões em recursos, o programa visa levar internet de alta velocidade a comunidades rurais e regiões remotas.\n\nSegundo o ministro das Comunicações, a iniciativa faz parte do plano estratégico de transformação digital e pretende conectar mais de 30 milhões de brasileiros que ainda não possuem acesso adequado à internet.\n\nO pacote inclui a instalação de fibra óptica em municípios com menos de 50 mil habitantes, além de subsídios para operadoras que atuarem em áreas de difícil acesso. Especialistas apontam que o investimento pode impulsionar significativamente a economia digital nas regiões beneficiadas.",
   },
   {
@@ -47,7 +47,7 @@ export const articles: Article[] = [
     category: "Política",
     author: "Roberto Almeida",
     date: "2026-03-23",
-    imageUrl: "https://images.unsplash.com/photo-1563986768609-322da13575f2?w=800&q=80",
+    imageUrl: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80",
     body: "A versão atualizada da Lei Geral de Proteção de Dados (LGPD) entrou em vigor nesta semana, trazendo regras mais rígidas para o tratamento de dados pessoais por empresas e organizações.\n\nEntre as principais mudanças estão a obrigatoriedade de relatórios de impacto para qualquer operação que envolva dados sensíveis e multas que podem chegar a 4% do faturamento bruto da empresa.\n\nA Autoridade Nacional de Proteção de Dados (ANPD) concedeu um prazo de 90 dias para que as empresas se adequem às novas exigências.",
   },
   {

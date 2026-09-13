@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { RadioPlayerProvider } from "@/contexts/RadioPlayerContext";
 import { renderWithProviders } from "./utils";
@@ -12,27 +12,28 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
   // jsdom não implementa scrollIntoView; limpa o mock aplicado no teste de âncora.
   delete (Element.prototype as unknown as Record<string, unknown>).scrollIntoView;
 });
 
-describe("Home (portal editorial unificado)", () => {
-  it("renderiza as seções principais do layout editorial", () => {
+describe("Home (área da rádio — separada das notícias)", () => {
+  it("renderiza as seções da rádio: hero, programação, podcasts, entretenimento e institucional", () => {
     renderWithProviders(<Home />);
 
-    // Banner de capa com carrossel
-    expect(screen.getByText("Breaking news")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Próxima notícia/i })).toBeInTheDocument();
+    // Hero da rádio (o rodapé repete a marca em heading próprio)
+    expect(screen.getAllByRole("heading", { name: "Web Rádio Vitória" }).length).toBeGreaterThan(0);
 
-    // Overview editorial: programação + em alta + manchetes
+    // Programação + podcasts
     expect(screen.getByRole("heading", { name: /Programação/i })).toBeInTheDocument();
-    expect(screen.getByText("O que está bombando")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Manchetes do dia/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Podcasts" })).toBeInTheDocument();
 
-    // Faixas de mídia: reels, stories, vídeos
+    // Entretenimento: reels + stories
+    expect(screen.getByRole("heading", { name: /Reels e stories/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Reels da redação/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Stories em destaque/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Mais notícias/i })).toBeInTheDocument();
+
+    // Vídeos
     expect(screen.getByRole("heading", { name: /Vídeos e cortes de lives/i })).toBeInTheDocument();
 
     // Área institucional integrada
@@ -43,25 +44,37 @@ describe("Home (portal editorial unificado)", () => {
     expect(screen.getByText(/Tupã, SP — Brasil/i)).toBeInTheDocument();
   });
 
-  it("expõe links de navegação para portal, contato e área institucional", () => {
+  it("não exibe conteúdo de notícias na home (breaking news, manchetes, listagens)", () => {
     renderWithProviders(<Home />);
 
-    expect(screen.getAllByRole("link", { name: "Notícias" })[0]).toHaveAttribute(
-      "href",
-      "/noticias",
-    );
-    expect(screen.getAllByRole("link", { name: "Institucional" })[0]).toHaveAttribute(
+    expect(screen.queryByText("Breaking news")).not.toBeInTheDocument();
+    expect(screen.queryByText("Manchetes do dia")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Mais notícias/i })).not.toBeInTheDocument();
+  });
+
+  it("expõe os acessos para Vitória News, institucional e contato (sem item Contato no menu)", () => {
+    renderWithProviders(<Home />);
+
+    const vitoriaNewsLinks = screen.getAllByRole("link", { name: "Vitória News" });
+    expect(vitoriaNewsLinks.length).toBeGreaterThan(0);
+    expect(vitoriaNewsLinks[0]).toHaveAttribute("href", "/noticias");
+
+    expect(screen.getByRole("link", { name: "Institucional" })).toHaveAttribute(
       "href",
       "/#institucional",
     );
-    expect(screen.getAllByRole("link", { name: "Contato" })[0]).toHaveAttribute(
-      "href",
-      "/contato",
-    );
+
+    // O menu principal não tem mais o item "Contato" — ele foi substituído
+    // pelo botão "Fale conosco" no topo do site.
+    const navigation = screen.getByRole("navigation", { name: /Navegação principal/i });
+    expect(within(navigation).queryByRole("link", { name: "Contato" })).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link", { name: /Fale conosco/i })[0],
+    ).toHaveAttribute("href", "/contato");
   });
 });
 
-describe("Index (portal de notícias)", () => {
+describe("Index (portal de notícias — Vitória News)", () => {
   it("renderiza a listagem de notícias e os filtros de categoria", () => {
     renderWithProviders(<Index />);
 
@@ -82,20 +95,7 @@ describe("Index (portal de notícias)", () => {
     expect(screen.getByText("— Tecnologia")).toBeInTheDocument();
   });
 
-  it("sincroniza o filtro ao navegar pelo menu enquanto está em /noticias", () => {
-    renderWithProviders(<Index />);
-
-    // Nenhum filtro ativo inicialmente
-    expect(screen.queryByText("— Tecnologia")).not.toBeInTheDocument();
-
-    // Clicar no item "Tecnologia" do cabeçalho muda a URL (?categoria=Tecnologia)
-    // e o filtro deve acompanhar mesmo sem clicar no botão da listagem.
-    fireEvent.click(screen.getByRole("link", { name: "Tecnologia" }));
-
-    expect(screen.getByText("— Tecnologia")).toBeInTheDocument();
-  });
-
-  it("respeita a categoria vinda da URL ao carregar", () => {
+  it("sincroniza o filtro ao chegar com a categoria na URL (navegação do menu)", () => {
     renderWithProviders(<Index />, { route: "/noticias?categoria=Tecnologia" });
     expect(screen.getByText("— Tecnologia")).toBeInTheDocument();
   });

@@ -76,6 +76,8 @@
     50% { transform: scaleY(0.35); }
   }
   .wave-bar { display: inline-block; transform-origin: bottom; animation: wave 1s ease-in-out infinite; }
+  /* Slider de progresso (barra estilo Spotify) */
+  .range-brand { accent-color: hsl(var(--brand)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

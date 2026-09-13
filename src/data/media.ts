@@ -27,3 +27,64 @@ export const institutionalServices = [
   { title: "Conteúdo espiritual", description: "Mensagens de fé e esperança para acompanhar toda a família." },
   { title: "Comunidade ativa", description: "Uma audiência presente nas redes e na programação da rádio." },
 ];
+
+/**
+ * Feed de vídeos, reels e stories recomendados (sugestões pós-podcast e
+ * reprodução automática). Cada item possui `images` (slideshow enquanto toca)
+ * e `audioUrl` de demonstração; quando `videoUrl` estiver definido, o
+ * mini-player exibe o vídeo real no lugar do slideshow.
+ */
+export interface VisualFeedItem {
+  id: string;
+  title: string;
+  category: "Vídeo" | "Reel" | "Story";
+  image: string;
+  images?: string[];
+  audioUrl?: string;
+  videoUrl?: string;
+  duration?: string;
+}
+
+const demoAudio = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3";
+const demoAudioB = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3";
+const demoVideo = "https://www.w3schools.com/html/mov_bbb.mp4";
+
+export const breakingVisuals: VisualFeedItem[] = [
+  {
+    id: "brk-1",
+    title: "Infraestrutura digital: o pacote de R$ 12 bi",
+    category: "Vídeo",
+    image: articles[0].imageUrl,
+    images: [articles[0].imageUrl, articles[1].imageUrl],
+    audioUrl: demoAudio,
+    videoUrl: demoVideo,
+    duration: "0:42",
+  },
+  {
+    id: "brk-2",
+    title: "IA nos diagnósticos médicos",
+    category: "Reel",
+    image: articles[1].imageUrl,
+    images: [articles[1].imageUrl, articles[5].imageUrl],
+    audioUrl: demoAudioB,
+    duration: "0:36",
+  },
+  {
+    id: "brk-3",
+    title: "LGPD: o que muda agora",
+    category: "Story",
+    image: articles[3].imageUrl,
+    images: [articles[3].imageUrl, articles[2].imageUrl],
+    audioUrl: demoAudio,
+    duration: "0:28",
+  },
+  {
+    id: "brk-4",
+    title: "Bateria solar brasileira",
+    category: "Reel",
+    image: articles[4].imageUrl,
+    images: [articles[4].imageUrl, articles[1].imageUrl],
+    audioUrl: demoAudioB,
+    duration: "0:51",
+  },
+];

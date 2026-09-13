@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { createRef } from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { createRef, act } from "react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { RadioPlayerProvider } from "@/contexts/RadioPlayerContext";
 import Home from "@/pages/Home";
@@ -11,6 +11,7 @@ import {
   ListenNowButton,
   useRadioPlayer,
 } from "@/components/RadioPlayer";
+import { podcasts } from "@/data/podcasts";
 import { submitContact } from "@/lib/contact";
 import { initAnalytics } from "@/lib/analytics";
 import { renderWithProviders } from "./utils";
@@ -27,6 +28,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
   document.head.innerHTML = "";
 });
 
@@ -149,7 +151,98 @@ describe("useRadioPlayer", () => {
     }
     render(<Probe />);
     api.openPlayer();
-    expect(api.open).toBe(false);
+    expect(api.liveOpen).toBe(false);
+  });
+});
+
+describe("Podcast — barra estilo Spotify pausa a transmissão ao vivo", () => {
+  it("ao tocar um podcast, a rádio ao vivo é pausada e a barra do episódio entra no lugar", () => {
+    vi.stubEnv("VITE_RADIO_STREAM_URL", "https://stream.example.com/live");
+    mockMedia();
+
+    renderWithProviders(<Home />);
+
+    // Abre a transmissão ao vivo pelo cabeçalho.
+    fireEvent.click(screen.getAllByRole("button", { name: /Ouvir Agora/i })[0]);
+    expect(screen.getByTestId("radio-player-bar")).toBeInTheDocument();
+
+    // Toca o primeiro podcast da programação.
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Reproduzir podcast/i })[0],
+    );
+
+    // A ao vivo é pausada e a barra estilo Spotify assume o rodapé.
+    expect(screen.queryByTestId("radio-player-bar")).not.toBeInTheDocument();
+    const npBar = screen.getByTestId("now-playing-bar");
+    expect(npBar).toBeInTheDocument();
+    expect(npBar.querySelector("audio")).toHaveAttribute(
+      "src",
+      podcasts[0].audioUrl,
+    );
+  });
+
+  it("minimiza a barra em um card flutuante no canto esquerdo", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Reproduzir podcast/i })[0],
+    );
+    expect(screen.getByTestId("now-playing-bar")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Minimizar player/i }));
+
+    expect(screen.queryByTestId("now-playing-bar")).not.toBeInTheDocument();
+    const floating = screen.getByTestId("floating-player");
+    expect(floating).toBeInTheDocument();
+  });
+
+  it("ao terminar o episódio, mostra sugestões e reproduz uma recomendação após 3 segundos", () => {
+    vi.useFakeTimers();
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Reproduzir podcast/i })[0],
+    );
+
+    // Simula o fim do áudio do episódio.
+    const audio = screen
+      .getByTestId("now-playing-bar")
+      .querySelector("audio") as HTMLAudioElement;
+    fireEvent(audio, new Event("ended"));
+
+    expect(screen.getByTestId("suggestions-panel")).toBeInTheDocument();
+
+    // Nada escolhido: após 3 segundos, a recomendação começa automaticamente.
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(screen.getByTestId("video-bubble")).toBeInTheDocument();
+  });
+
+  it("dá play em um vídeo/reel/story escolhido no painel de sugestões", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Reproduzir podcast/i })[0],
+    );
+    const audio = screen
+      .getByTestId("now-playing-bar")
+      .querySelector("audio") as HTMLAudioElement;
+    fireEvent(audio, new Event("ended"));
+
+    const suggest = screen.getByTestId("suggestions-panel");
+    fireEvent.click(
+      within(suggest).getAllByRole("button").find(
+        (button) => button.textContent && /Assistir|Infraestrutura/i.test(button.textContent),
+      ) as HTMLButtonElement,
+    );
+
+    expect(screen.queryByTestId("suggestions-panel")).not.toBeInTheDocument();
+    expect(screen.getByTestId("video-bubble")).toBeInTheDocument();
   });
 });
 
