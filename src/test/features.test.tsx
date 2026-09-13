@@ -30,6 +30,8 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
   document.head.innerHTML = "";
+  // Preferências persistidas pelo player (ex.: legendas on/off).
+  window.localStorage.clear();
 });
 
 describe("RadioPlayer — player global no cabeçalho", () => {
@@ -448,7 +450,7 @@ describe("Home — player imersivo no banner gigante", () => {
     expect(screen.queryByTestId("watch-overlay")).not.toBeInTheDocument();
   });
 
-  it("silencia e restaura o volume do vídeo pelos controles do overlay", () => {
+  it("silencia e restaura o volume do vídeo pelo alto-falante e pela barra", () => {
     mockMedia();
     renderWithProviders(<Home />);
 
@@ -459,18 +461,19 @@ describe("Home — player imersivo no banner gigante", () => {
     );
     const media = screen.getByTestId("watch-media") as HTMLVideoElement;
 
-    fireEvent.click(screen.getByRole("button", { name: /Silenciar vídeo/i }));
+    // Barra de volume: desliza até 40% e aplica na mídia.
+    const slider = screen.getByRole("slider", { name: /Volume do vídeo/i });
+    fireEvent.change(slider, { target: { value: "0.4" } });
+    expect(media.volume).toBeCloseTo(0.4);
+
+    // No zero, a barra silencia a mídia.
+    fireEvent.change(slider, { target: { value: "0" } });
     expect(media.muted).toBe(true);
-    expect(
-      screen.getByRole("button", { name: /Ativar som do vídeo/i }),
-    ).toBeInTheDocument();
 
-    // Abaixa o volume (15% por passo) e aplica na mídia.
-    fireEvent.click(screen.getByRole("button", { name: /Abaixar o volume do vídeo/i }));
-    expect(media.volume).toBeLessThan(1);
-
+    // Clicar no alto-falante restaura o som com um volume útil.
     fireEvent.click(screen.getByRole("button", { name: /Ativar som do vídeo/i }));
     expect(media.muted).toBe(false);
+    expect(media.volume).toBeCloseTo(0.85);
   });
 
   it("alterna as legendas (CC) sobre o vídeo", () => {
@@ -489,6 +492,46 @@ describe("Home — player imersivo no banner gigante", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Legendas do vídeo/i }));
     expect(screen.getByTestId("watch-caption")).toBeInTheDocument();
+  });
+
+  it("lembra a escolha das legendas ao fechar e reabrir o player", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    const openReel = () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /Assistir Inteligência artificial na saúde/i,
+        }),
+      );
+    };
+
+    openReel();
+    expect(screen.getByTestId("watch-caption")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Legendas do vídeo/i }));
+    expect(screen.queryByTestId("watch-caption")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Fechar player/i }));
+    openReel();
+    // Fechar e reabrir mantém as legendas desligadas.
+    expect(screen.queryByTestId("watch-caption")).not.toBeInTheDocument();
+  });
+
+  it("clicar no botão central do banner reproduz com o áudio ativado", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
+      }),
+    );
+
+    expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
+    const media = screen.getByTestId("watch-media") as HTMLVideoElement;
+    expect(media).toHaveAttribute("src", expect.stringContaining("?v=video-1"));
+    // Vídeo/live entram com o áudio ativado.
+    expect(media.muted).toBe(false);
   });
 
   it("no hero em repouso mostra o título e a descrição do vídeo em destaque", () => {

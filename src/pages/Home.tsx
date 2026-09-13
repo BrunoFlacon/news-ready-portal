@@ -10,7 +10,6 @@ import {
   Play,
   Radio,
   Users,
-  Volume1,
   Volume2,
   VolumeX,
   X,
@@ -40,6 +39,7 @@ const AUTO_ROTATE_MS = 8000;
 const TRANSITION_MS = 12000;
 const AD_STEP_MS = 4000;
 const UI_HIDE_MS = 10000;
+const WATCH_CC_STORAGE_KEY = "radio.watch.cc";
 
 /** Descrição curta exibida no carrossel e no painel de informações do player. */
 const watchBlurb = (item: WatchFeedItem) =>
@@ -70,6 +70,8 @@ interface WatchOverlayProps {
   adIndex: number;
   ambient: AmbientPalette;
   uiVisible: boolean;
+  cc: boolean;
+  onToggleCc: () => void;
   onShowUi: () => void;
   onHideUi: () => void;
   onToggleUi: () => void;
@@ -83,6 +85,8 @@ function WatchOverlay({
   adIndex,
   ambient,
   uiVisible,
+  cc,
+  onToggleCc,
   onShowUi,
   onHideUi,
   onToggleUi,
@@ -98,7 +102,6 @@ function WatchOverlay({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.85);
-  const [cc, setCc] = useState(true);
 
   // Aplica volume/mudo ao vídeo — inclusive quando o item troca de mídia.
   useEffect(() => {
@@ -109,9 +112,21 @@ function WatchOverlay({
     }
   }, [muted, volume, item.id]);
 
+  const toggleMute = () => {
+    if (muted) {
+      // Restaurar o som: se a barra estava no zero, volta a um nível útil.
+      if (volume === 0) {
+        setVolume(0.85);
+      }
+      setMuted(false);
+    } else {
+      setMuted(true);
+    }
+  };
+
   const mediaBox = vertical ? (
-    // Reels/stories em 9:16 centralizado, limitado pela altura da tela.
-    <div className="relative aspect-[9/16] h-full max-h-[62vh] w-auto overflow-hidden rounded-lg bg-black shadow-2xl">
+    // Reels/stories em 9:16: ocupa a altura TODA do banner, bem maior.
+    <div className="relative aspect-[9/16] h-full w-auto overflow-hidden rounded-lg bg-black shadow-2xl">
       <video
         key={item.id}
         ref={videoRef}
@@ -126,10 +141,8 @@ function WatchOverlay({
       />
     </div>
   ) : (
-    // Vídeos/lives em 16:9: o contêiner ocupa TODO o banner e o vídeo cresce
-    // até preencher a tela (object-contain preserva a proporção sem cortes —
-    // as sobras mostram o fundo ambiente animado).
-    <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden rounded-lg shadow-2xl">
+    // Vídeos/lives em 16:9: preenchem TODO o banner (object-cover cobre a tela).
+    <div className="h-full w-full overflow-hidden">
       <video
         key={item.id}
         ref={videoRef}
@@ -140,7 +153,7 @@ function WatchOverlay({
         playsInline
         muted={muted}
         onEnded={onEnded}
-        className="max-h-full max-w-full object-contain"
+        className="h-full w-full object-cover"
       />
     </div>
   );
@@ -201,35 +214,33 @@ function WatchOverlay({
             >
               <button
                 type="button"
-                onClick={() => setMuted((value) => !value)}
+                onClick={toggleMute}
                 aria-label={muted ? "Ativar som do vídeo" : "Silenciar vídeo"}
                 aria-pressed={muted}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
               >
                 {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
               </button>
-              <button
-                type="button"
-                onClick={() => setVolume((value) => Math.max(0.1, Math.round((value - 0.15) * 100) / 100))}
-                aria-label="Abaixar o volume do vídeo"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
-              >
-                <Volume1 className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setVolume((value) => Math.min(1, Math.round((value + 0.15) * 100) / 100))}
-                aria-label="Aumentar o volume do vídeo"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
-              >
-                <Volume2 className="h-4 w-4" />
-              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={muted ? 0 : volume}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  setVolume(value);
+                  setMuted(value === 0);
+                }}
+                aria-label="Volume do vídeo"
+                className="h-1.5 w-24 cursor-pointer accent-brand lg:w-32"
+              />
               <span className="hidden w-10 text-center text-[10px] font-bold tabular-nums text-foreground sm:inline">
-                {Math.round(volume * 100)}%
+                {muted ? 0 : Math.round(volume * 100)}%
               </span>
               <button
                 type="button"
-                onClick={() => setCc((value) => !value)}
+                onClick={onToggleCc}
                 aria-label="Legendas do vídeo"
                 aria-pressed={cc}
                 className={cn(
@@ -250,13 +261,13 @@ function WatchOverlay({
             </div>
           </div>
 
-          {/* Legenda (CC) sobre o vídeo, como no YouTube */}
+          {/* Legenda (CC) sobre o vídeo, sem tarja preta — sombra dá o contraste */}
           {cc && (
             <div
               data-testid="watch-caption"
               className="pointer-events-none absolute inset-x-0 bottom-16 z-20 flex justify-center px-4 lg:bottom-24"
             >
-              <p className="max-w-3xl rounded-md bg-black/60 px-4 py-2 text-center text-sm leading-relaxed text-white backdrop-blur-sm">
+              <p className="max-w-3xl px-4 py-2 text-center text-sm font-medium leading-relaxed text-white [text-shadow:_0_1px_2px_rgba(0,0,0,0.9),_0_0_10px_rgba(0,0,0,0.6)]">
                 {item.caption}
               </p>
             </div>
@@ -407,6 +418,18 @@ function RadioHero({
   const [uiVisible, setUiVisible] = useState(true);
   const [adIndex, setAdIndex] = useState(0);
 
+  // Legenda (CC): o player lembra a escolha do usuário entre sessões.
+  const [cc, setCc] = useState(
+    () => window.localStorage.getItem(WATCH_CC_STORAGE_KEY) !== "off",
+  );
+  const toggleCc = useCallback(() => {
+    setCc((value) => {
+      const next = !value;
+      window.localStorage.setItem(WATCH_CC_STORAGE_KEY, next ? "on" : "off");
+      return next;
+    });
+  }, []);
+
   const active = watchFeed[activeIndex % watchFeed.length];
 
   // Rotação automática dos destaques — suspensa enquanto o banner é usado.
@@ -479,88 +502,65 @@ function RadioHero({
     >
       {!watch && (
         <>
-          <div className="absolute inset-0">
-            <img src={active.image} alt="" className="h-full w-full object-cover" />
+          {/* A capa do destaque cobre o banner inteiro; clicar reproduz com
+              áudio ativado (vídeo ou live), sem duplicar a imagem num card. */}
+          <button
+            type="button"
+            onClick={() => onPlay(active)}
+            aria-label={`Reproduzir ${active.title}`}
+            className="group absolute inset-0 block h-full w-full"
+          >
+            <img
+              src={active.image}
+              alt=""
+              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+            />
             <div className="absolute inset-0 bg-hero-overlay" />
-          </div>
+            {/* Botão do player no centro da tela, como no YouTube */}
+            <span className="absolute inset-0 flex items-center justify-center">
+              <span className="flex h-20 w-20 items-center justify-center rounded-full bg-brand/95 text-brand-foreground shadow-2xl ring-4 ring-white/25 transition-transform duration-200 group-hover:scale-110 md:h-24 md:w-24">
+                <Play className="h-9 w-9 translate-x-0.5 fill-current md:h-10 md:w-10" />
+              </span>
+            </span>
+          </button>
           <div className="container relative flex min-h-[640px] flex-col justify-end py-12 md:min-h-[700px] md:py-16">
-            <div className="grid items-end gap-10 lg:grid-cols-[1fr_26rem]">
-              <div className="max-w-2xl">
-                <div className="mb-5 flex flex-wrap items-center gap-3">
-                  {hasStream ? (
+            <div className="max-w-2xl">
+              <div className="mb-5 flex flex-wrap items-center gap-3">
+                {hasStream ? (
+                  <span className="inline-flex items-center gap-2 rounded-sm bg-live px-3 py-1.5 text-[10px] font-bold uppercase text-live-foreground">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" />
+                    Ao vivo
+                  </span>
+                ) : upcomingLive ? (
+                  <>
                     <span className="inline-flex items-center gap-2 rounded-sm bg-live px-3 py-1.5 text-[10px] font-bold uppercase text-live-foreground">
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" />
-                      Ao vivo
+                      Em breve live
                     </span>
-                  ) : upcomingLive ? (
-                    <>
-                      <span className="inline-flex items-center gap-2 rounded-sm bg-live px-3 py-1.5 text-[10px] font-bold uppercase text-live-foreground">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" />
-                        Em breve live
-                      </span>
-                      <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
-                        {upcomingLive.day} • {upcomingLive.time}
-                      </span>
-                    </>
-                  ) : null}
-                  <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
-                    De Tupã para todo o Brasil
-                  </span>
-                </div>
-                <div className="flex items-start gap-4 sm:gap-5">
-                  <span className="mt-1 hidden h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg sm:flex">
-                    <Play className="h-5 w-5 translate-x-0.5 fill-current" />
-                  </span>
-                  <div className="min-w-0">
-                    <h1 className="font-serif text-3xl font-bold leading-tight text-overlay-foreground md:text-5xl">
-                      {active.title}
-                    </h1>
-                    <p className="mt-3 max-w-2xl text-base leading-relaxed text-overlay-muted md:text-lg">
-                      {watchBlurb(active)}
-                    </p>
-                    <div className="mt-6">
-                      <Button asChild variant="outline" size="lg">
-                        <Link to="/noticias">
-                          <Newspaper className="h-5 w-5" /> Acessar Vitória News
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                    <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
+                      {upcomingLive.day} • {upcomingLive.time}
+                    </span>
+                  </>
+                ) : null}
+                <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
+                  De Tupã para todo o Brasil
+                </span>
               </div>
-
-              {/* Destaques do banner: carrossel automático */}
-              <div className="overflow-hidden rounded-lg border border-border bg-card/90 shadow-2xl backdrop-blur-md" aria-label={`Destaque: ${active.title}`}>
-                <div className="relative aspect-video overflow-hidden bg-black">
-                  <button type="button" onClick={() => onPlay(active)} className="group relative block h-full w-full text-left">
-                    <img src={active.image} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                    <div className="absolute inset-0 bg-media-overlay" />
-                    <span className="absolute left-3 top-3 rounded-sm bg-background/85 px-2 py-1 text-[10px] font-bold uppercase text-foreground">
-                      {active.kicker}
-                    </span>
-                    <span className="absolute inset-x-0 bottom-0 flex items-center gap-2 p-4">
-                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-transform duration-200 group-hover:scale-110">
-                        <Play className="h-5 w-5 translate-x-0.5 fill-current" />
-                      </span>
-                      <span className="font-serif text-lg font-bold text-overlay-foreground">{active.title}</span>
-                    </span>
-                  </button>
-                </div>
-                <div className="flex items-center justify-between gap-3 p-4">
-                  <div className="min-w-0">
-                    <p className="editorial-kicker">{active.kicker}</p>
-                    <p className="mt-0.5 truncate font-serif text-sm font-bold text-foreground">{active.title}</p>
+              <div className="flex items-start gap-4 sm:gap-5">
+                <div className="min-w-0">
+                  <h1 className="font-serif text-3xl font-bold leading-tight text-overlay-foreground md:text-5xl">
+                    {active.title}
+                  </h1>
+                  <p className="mt-3 max-w-2xl text-base leading-relaxed text-overlay-muted md:text-lg">
+                    {watchBlurb(active)}
+                  </p>
+                  <div className="mt-6">
+                    <Button asChild variant="outline" size="lg">
+                      <Link to="/noticias">
+                        <Newspaper className="h-5 w-5" /> Acessar Vitória News
+                      </Link>
+                    </Button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onPlay(active)}
-                    className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-xs font-bold text-brand-foreground transition-colors hover:bg-accent"
-                  >
-                    <Play className="h-3.5 w-3.5 fill-current" /> Assistir
-                  </button>
-                  <span className="flex-shrink-0 text-xs tabular-nums text-muted-foreground">
-                    {activeIndex + 1}/{watchFeed.length}
-                  </span>
                 </div>
               </div>
             </div>
@@ -579,6 +579,8 @@ function RadioHero({
           adIndex={adIndex}
           ambient={ambient}
           uiVisible={uiVisible}
+          cc={cc}
+          onToggleCc={toggleCc}
           onShowUi={() => setUiVisible(true)}
           onHideUi={() => setUiVisible(false)}
           onToggleUi={() => setUiVisible((visible) => !visible)}
@@ -760,8 +762,7 @@ function EntertainmentBand({ onSelectId }: { onSelectId: (id: string) => void })
       <div className="container">
         <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="editorial-kicker">Web Rádio</p>
-            <h2 className="mt-2 font-serif text-3xl font-bold md:text-4xl">Entretenimento</h2>
+            <h2 className="font-serif text-3xl font-bold md:text-4xl">Entretenimento</h2>
             <p className="mt-2 text-muted-foreground">Reels e stories produzidos pela redação.</p>
           </div>
         </div>
