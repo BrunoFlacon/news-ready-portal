@@ -2,6 +2,7 @@ import { Link, NavLink } from "react-router-dom";
 import { Menu, X, Radio, Play, Headphones } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
 
 const navItems = [
   { label: "Início", path: "/" },
@@ -15,6 +16,7 @@ const navItems = [
 
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const player = useRadioPlayerContext();
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-xl">
@@ -26,8 +28,28 @@ export function SiteHeader() {
           <span className="min-w-0"><strong className="block truncate font-serif text-lg text-foreground">Web Rádio Vitória</strong><small className="block truncate text-[10px] uppercase text-muted-foreground">Notícias • Informação • Fé</small></span>
         </Link>
         <div className="hidden items-center gap-3 lg:flex">
-          <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase text-live"><span className="h-2 w-2 animate-pulse rounded-full bg-live" />Ao vivo</span>
-          <Button variant="secondary" size="sm" disabled title="Transmissão em breve"><Play className="fill-current" /> Em breve</Button>
+          {player.streamUrl && (
+            <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase text-live"><span className="h-2 w-2 animate-pulse rounded-full bg-live" />Ao vivo</span>
+          )}
+          {player.streamUrl ? (
+            <button
+              type="button"
+              onClick={player.openPlayer}
+              className="btn-brand h-9 px-4"
+            >
+              <Play className="h-4 w-4 fill-current" />
+              {player.playing ? "Pausar" : "Ouvir Agora"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-md bg-secondary px-4 text-sm font-medium text-secondary-foreground opacity-60"
+            >
+              <Play className="h-4 w-4 fill-current" />
+              Em breve
+            </button>
+          )}
           <Button asChild size="sm"><Link to="/contato"><Headphones /> Fale conosco</Link></Button>
         </div>
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={menuOpen}>

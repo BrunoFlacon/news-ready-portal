@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useEffect } from "react";
+import { toast } from "sonner";
 import { Layout } from "@/components/Layout";
 import { articles } from "@/data/articles";
 import { Facebook, Twitter, Linkedin, MessageCircle, Share2 } from "lucide-react";
@@ -103,9 +104,15 @@ const ArticlePage = () => {
               aria-label="Copiar link"
               title="Copiar link"
               className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
-              onClick={() => {
-                if (navigator.clipboard) {
-                  navigator.clipboard.writeText(shareUrl);
+              onClick={async () => {
+                if (!navigator.clipboard) {
+                  return;
+                }
+                try {
+                  await navigator.clipboard.writeText(shareUrl);
+                  toast.success("Link copiado!");
+                } catch {
+                  toast.error("Não foi possível copiar o link.");
                 }
               }}
             >

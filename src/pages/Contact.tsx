@@ -13,12 +13,50 @@ import {
 import { MapView } from "@/components/Map";
 import { submitContact } from "@/lib/contact";
 
-const CONTACT_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663537524925/WyaUbNtmjegzP69poquyFv/contact_bg-guoSwTzDBxScSGbHS9FZtk.webp";
-
 const TUPÃ_COORDS = { lat: -21.9333, lng: -50.5167 } as const;
 const GOOGLE_MAPS_LINK =
   "https://www.google.com/maps/search/?api=1&query=Av.+Tamoios%2C+Tup%C3%A3%2C+SP%2C+Brasil";
 const HAS_MAPS_API_KEY = Boolean(import.meta.env.VITE_FRONTEND_FORGE_API_KEY);
+
+const channels = [
+  { icon: MapPin, label: "Endereço", value: "Av. Tamoios, Tupã, SP, Brasil" },
+  {
+    icon: Instagram,
+    label: "Instagram",
+    value: "@webradiovitoriaa",
+    href: "https://instagram.com/webradiovitoriaa",
+  },
+  {
+    icon: Youtube,
+    label: "YouTube",
+    value: "webradiovitoria",
+    href: "https://youtube.com/@webradiovitoria",
+  },
+  {
+    icon: Twitter,
+    label: "Twitter / X",
+    value: "@WebRadi0Vitoria",
+    href: "https://x.com/WebRadi0Vitoria",
+  },
+  {
+    icon: Facebook,
+    label: "Facebook",
+    value: "facebook.com/webradiovitoria",
+    href: "https://facebook.com/webradiovitoria",
+  },
+];
+
+const socials = [
+  { icon: Facebook, href: "https://facebook.com/webradiovitoria", label: "Facebook" },
+  { icon: Instagram, href: "https://instagram.com/webradiovitoriaa", label: "Instagram" },
+  { icon: Youtube, href: "https://youtube.com/@webradiovitoria", label: "YouTube" },
+  { icon: Twitter, href: "https://x.com/WebRadi0Vitoria", label: "Twitter / X" },
+];
+
+const inputClassName =
+  "w-full rounded-md border border-input bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring transition-colors";
+
+const labelClassName = "mb-2 block text-sm font-semibold text-foreground";
 
 const Contact = () => {
   const [form, setForm] = useState({ name: "", email: "", phone: "", message: "" });
@@ -43,141 +81,79 @@ const Contact = () => {
 
   return (
     <Layout>
-      <section
-        id="contato"
-        className="py-16 md:py-20 relative overflow-hidden"
-        style={{
-          backgroundImage: `url(${CONTACT_BG})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        <div className="absolute inset-0 bg-[#0b1e3d]/92" />
-
-        <div className="container mx-auto px-4 relative z-10">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 text-[#c9a227] text-sm font-semibold uppercase tracking-widest mb-4" style={{ fontFamily: "'Lato', sans-serif" }}>
-              <div className="w-8 h-0.5 bg-[#c9a227]" />
-              Entre em Contato
-              <div className="w-8 h-0.5 bg-[#c9a227]" />
-            </div>
-            <h1
-              className="text-4xl md:text-5xl font-bold text-white mb-4"
-              style={{ fontFamily: "'Playfair Display', serif" }}
-            >
-              Fale com a{" "}
-              <span className="text-[#c9a227] italic">Rádio</span>
+      <section className="page-band">
+        <div className="container">
+          {/* Cabeçalho editorial */}
+          <div className="max-w-2xl">
+            <p className="editorial-kicker">Contato</p>
+            <h1 className="mt-3 font-serif text-4xl font-bold md:text-5xl">
+              Fale com a <span className="text-brand">Rádio</span>
             </h1>
-            <div className="section-divider mx-auto mb-6" />
-            <p
-              className="text-white/70 max-w-xl mx-auto"
-              style={{ fontFamily: "'Lato', sans-serif" }}
-            >
+            <p className="mt-5 text-lg leading-relaxed text-muted-foreground">
               Tem alguma sugestão, dúvida ou quer participar da nossa programação?
               Envie uma mensagem e nossa equipe responderá em breve.
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-12 items-start max-w-5xl mx-auto">
-            {/* Contact Info */}
-            <div>
-              <h2
-                className="text-2xl font-bold text-white mb-8"
-                style={{ fontFamily: "'Playfair Display', serif" }}
-              >
-                Informações de Contato
-              </h2>
-
-              <div className="space-y-6">
-                {[
-                  {
-                    icon: <MapPin className="w-5 h-5" />,
-                    label: "Endereço",
-                    value: "Av. Tamoios, Tupã, SP, Brasil",
-                  },
-                  {
-                    icon: <Instagram className="w-5 h-5" />,
-                    label: "Instagram",
-                    value: "@webradiovitoriaa",
-                  },
-                  {
-                    icon: <Youtube className="w-5 h-5" />,
-                    label: "YouTube",
-                    value: "webradiovitoria",
-                  },
-                  {
-                    icon: <Twitter className="w-5 h-5" />,
-                    label: "Twitter / X",
-                    value: "@WebRadi0Vitoria",
-                  },
-                  {
-                    icon: <Facebook className="w-5 h-5" />,
-                    label: "Facebook",
-                    value: "facebook.com/webradiovitoria",
-                  },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-[#c9a227]/20 border border-[#c9a227]/40 flex items-center justify-center text-[#c9a227] flex-shrink-0">
-                      {item.icon}
-                    </div>
-                    <div>
-                      <div
-                        className="text-white/50 text-xs uppercase tracking-widest mb-1"
-                        style={{ fontFamily: "'Lato', sans-serif" }}
-                      >
-                        {item.label}
-                      </div>
-                      <div
-                        className="text-white font-medium"
-                        style={{ fontFamily: "'Lato', sans-serif" }}
-                      >
-                        {item.value}
+          <div className="mt-12 grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-start">
+            {/* Informações de contato */}
+            <div className="space-y-10">
+              <div>
+                <h2 className="font-serif text-2xl font-bold">Informações de Contato</h2>
+                <div className="mt-6 space-y-4">
+                  {channels.map(({ icon: Icon, label, value, href }) => (
+                    <div key={label} className="flex items-start gap-4 rounded-md border border-border bg-card p-5">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand/15 text-brand">
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
+                        {href ? (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 block font-medium text-foreground transition-colors hover:text-brand"
+                          >
+                            {value}
+                          </a>
+                        ) : (
+                          <p className="mt-1 font-medium text-foreground">{value}</p>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
-              {/* Social Links */}
-              <div className="mt-10">
-                <p
-                  className="text-white/50 text-sm mb-4 uppercase tracking-widest"
-                  style={{ fontFamily: "'Lato', sans-serif" }}
-                >
+              {/* Redes sociais */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                   Siga-nos nas redes
                 </p>
-                <div className="flex gap-3">
-                  {[
-                    { icon: <Facebook className="w-5 h-5" />, href: "https://facebook.com/webradiovitoria", label: "Facebook" },
-                    { icon: <Instagram className="w-5 h-5" />, href: "https://instagram.com/webradiovitoriaa", label: "Instagram" },
-                    { icon: <Youtube className="w-5 h-5" />, href: "https://youtube.com/@webradiovitoria", label: "YouTube" },
-                    { icon: <Twitter className="w-5 h-5" />, href: "https://x.com/WebRadi0Vitoria", label: "Twitter / X" },
-                  ].map((social) => (
+                <div className="mt-4 flex gap-3">
+                  {socials.map(({ icon: Icon, href, label }) => (
                     <a
-                      key={social.label}
-                      href={social.href}
+                      key={label}
+                      href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      aria-label={social.label}
-                      className="w-10 h-10 rounded-full bg-white/10 hover:bg-[#c9a227] border border-white/20 hover:border-[#c9a227] flex items-center justify-center text-white hover:text-[#0b1e3d] transition-all duration-200"
+                      aria-label={label}
+                      className="grid h-10 w-10 place-items-center rounded-full border border-border bg-secondary text-muted-foreground transition-colors hover:border-brand hover:bg-brand hover:text-brand-foreground"
                     >
-                      {social.icon}
+                      <Icon className="h-5 w-5" />
                     </a>
                   ))}
                 </div>
               </div>
 
-              {/* Map */}
-              <div className="mt-10">
-                <p
-                  className="text-white/50 text-sm mb-4 uppercase tracking-widest"
-                  style={{ fontFamily: "'Lato', sans-serif" }}
-                >
+              {/* Mapa */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                   Onde estamos
                 </p>
                 {HAS_MAPS_API_KEY ? (
-                  <div className="rounded-2xl overflow-hidden border border-white/15 shadow-lg">
+                  <div className="mt-4 overflow-hidden rounded-md border border-border">
                     <MapView
                       className="h-[300px] w-full"
                       initialCenter={TUPÃ_COORDS}
@@ -189,38 +165,32 @@ const Contact = () => {
                     href={GOOGLE_MAPS_LINK}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex flex-col items-center gap-3 rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm p-8 text-center hover:bg-white/10 transition-colors"
+                    className="mt-4 flex flex-col items-center gap-3 rounded-md border border-border bg-card p-8 text-center transition-colors hover:border-brand"
                   >
-                    <div className="w-10 h-10 rounded-full bg-[#c9a227]/20 border border-[#c9a227]/40 flex items-center justify-center text-[#c9a227]">
-                      <MapPin className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p
-                        className="text-white font-medium"
-                        style={{ fontFamily: "'Lato', sans-serif" }}
-                      >
+                    <span className="grid h-10 w-10 place-items-center rounded-full bg-brand/15 text-brand">
+                      <MapPin className="h-5 w-5" />
+                    </span>
+                    <span>
+                      <span className="block font-medium text-foreground">
                         Av. Tamoios, Tupã — SP
-                      </p>
-                      <span className="inline-flex items-center gap-1.5 text-[#c9a227] text-sm font-semibold mt-1" style={{ fontFamily: "'Lato', sans-serif" }}>
-                        Ver no Google Maps
-                        <ExternalLink className="w-3.5 h-3.5" />
                       </span>
-                    </div>
+                      <span className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-brand">
+                        Ver no Google Maps
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </span>
+                    </span>
                   </a>
                 )}
               </div>
             </div>
 
-            {/* Form */}
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
-              <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Formulário */}
+            <div className="rounded-md border border-border bg-card p-8">
+              <h2 className="font-serif text-2xl font-bold">Envie sua mensagem</h2>
+              <form onSubmit={handleSubmit} className="mt-6 space-y-5">
                 <div>
-                  <label
-                    htmlFor="contact-name"
-                    className="block text-white/70 text-sm mb-2"
-                    style={{ fontFamily: "'Lato', sans-serif" }}
-                  >
-                    Nome completo <span className="text-[#c9a227]">*</span>
+                  <label htmlFor="contact-name" className={labelClassName}>
+                    Nome completo <span className="text-brand">*</span>
                   </label>
                   <input
                     id="contact-name"
@@ -228,17 +198,12 @@ const Contact = () => {
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="Seu nome"
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#c9a227] transition-colors"
-                    style={{ fontFamily: "'Lato', sans-serif" }}
+                    className={inputClassName}
                   />
                 </div>
                 <div>
-                  <label
-                    htmlFor="contact-email"
-                    className="block text-white/70 text-sm mb-2"
-                    style={{ fontFamily: "'Lato', sans-serif" }}
-                  >
-                    E-mail <span className="text-[#c9a227]">*</span>
+                  <label htmlFor="contact-email" className={labelClassName}>
+                    E-mail <span className="text-brand">*</span>
                   </label>
                   <input
                     id="contact-email"
@@ -246,16 +211,11 @@ const Contact = () => {
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     placeholder="seu@email.com"
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#c9a227] transition-colors"
-                    style={{ fontFamily: "'Lato', sans-serif" }}
+                    className={inputClassName}
                   />
                 </div>
                 <div>
-                  <label
-                    htmlFor="contact-phone"
-                    className="block text-white/70 text-sm mb-2"
-                    style={{ fontFamily: "'Lato', sans-serif" }}
-                  >
+                  <label htmlFor="contact-phone" className={labelClassName}>
                     Telefone (opcional)
                   </label>
                   <input
@@ -264,17 +224,12 @@ const Contact = () => {
                     value={form.phone}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })}
                     placeholder="(14) 99999-9999"
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#c9a227] transition-colors"
-                    style={{ fontFamily: "'Lato', sans-serif" }}
+                    className={inputClassName}
                   />
                 </div>
                 <div>
-                  <label
-                    htmlFor="contact-message"
-                    className="block text-white/70 text-sm mb-2"
-                    style={{ fontFamily: "'Lato', sans-serif" }}
-                  >
-                    Mensagem <span className="text-[#c9a227]">*</span>
+                  <label htmlFor="contact-message" className={labelClassName}>
+                    Mensagem <span className="text-brand">*</span>
                   </label>
                   <textarea
                     id="contact-message"
@@ -282,24 +237,22 @@ const Contact = () => {
                     onChange={(e) => setForm({ ...form, message: e.target.value })}
                     placeholder="Escreva sua mensagem aqui..."
                     rows={5}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#c9a227] transition-colors resize-none"
-                    style={{ fontFamily: "'Lato', sans-serif" }}
+                    className={`${inputClassName} resize-none`}
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={sending}
-                  className="w-full flex items-center justify-center gap-2 bg-[#c9a227] hover:bg-[#f0c040] disabled:opacity-50 text-[#0b1e3d] font-bold py-4 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
-                  style={{ fontFamily: "'Lato', sans-serif" }}
+                  className="flex w-full items-center justify-center gap-2 rounded-md bg-brand px-4 py-3.5 text-sm font-bold text-brand-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {sending ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-[#0b1e3d]/30 border-t-[#0b1e3d] rounded-full animate-spin" />
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-foreground/30 border-t-brand-foreground" />
                       Enviando...
                     </>
                   ) : (
                     <>
-                      <Send className="w-4 h-4" />
+                      <Send className="h-4 w-4" />
                       Enviar Mensagem
                     </>
                   )}

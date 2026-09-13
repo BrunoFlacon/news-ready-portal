@@ -5,13 +5,14 @@ import { Layout } from "@/components/Layout";
 import { MediaRail } from "@/components/MediaRail";
 import { NewsCard } from "@/components/NewsCard";
 import { Button } from "@/components/ui/button";
+import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
 import { articles, trendingTopics } from "@/data/articles";
 import { institutionalServices, socialMedia, stories, videoCuts } from "@/data/media";
 
 const featureArticles = articles.slice(0, 3);
 const institutionalImage = "https://d2xsxph8kpxj0f.cloudfront.net/310519663537524925/WyaUbNtmjegzP69poquyFv/about_section-GzvJS3t4GNMqHFnJjuDTRq.webp";
 
-function LeadCarousel() {
+function LeadCarousel({ hasStream, onOpenPlayer }: { hasStream: boolean; onOpenPlayer: () => void }) {
   const [active, setActive] = useState(0);
   const article = featureArticles[active];
   const move = (direction: number) => setActive((active + direction + featureArticles.length) % featureArticles.length);
@@ -37,7 +38,11 @@ function LeadCarousel() {
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-overlay-muted md:text-lg">{article.excerpt}</p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Button asChild size="lg"><Link to={`/artigo/${article.id}`}>Ler reportagem <ArrowRight /></Link></Button>
-            <Button variant="outline" size="lg" disabled><Play /> Live em breve</Button>
+            {hasStream ? (
+              <Button variant="outline" size="lg" onClick={onOpenPlayer}><Play /> Ouvir Agora</Button>
+            ) : (
+              <Button variant="outline" size="lg" disabled><Play /> Live em breve</Button>
+            )}
           </div>
         </div>
         <div className="absolute bottom-6 right-4 flex gap-2 md:right-8">
@@ -109,9 +114,11 @@ function InstitutionalBand() {
 }
 
 export default function Home() {
+  const player = useRadioPlayerContext();
+
   return (
     <Layout>
-      <LeadCarousel />
+      <LeadCarousel hasStream={Boolean(player.streamUrl)} onOpenPlayer={player.openPlayer} />
       <EditorialOverview />
       <section className="page-band border-y border-border bg-card"><div className="container grid gap-12 lg:grid-cols-2"><MediaRail title="Reels da redação" eyebrow="Reels" items={socialMedia} portrait /><MediaRail title="Stories em destaque" eyebrow="Stories" items={stories} portrait /></div></section>
       <section className="page-band"><div className="container"><div className="mb-7 flex items-end justify-between border-b border-border pb-4"><div><p className="editorial-kicker">Cobertura completa</p><h2 className="mt-2 font-serif text-3xl font-bold">Mais notícias</h2></div><Link to="/noticias" className="link-arrow">Acessar portal <ArrowRight /></Link></div><div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{articles.slice(0, 6).map((article) => <NewsCard key={article.id} article={article} />)}</div></div></section>

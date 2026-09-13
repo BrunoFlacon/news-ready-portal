@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { createRef } from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { RadioPlayerProvider } from "@/contexts/RadioPlayerContext";
 import Home from "@/pages/Home";
 import Contact from "@/pages/Contact";
+import ArticlePage from "@/pages/ArticlePage";
 import {
   RadioPlayerBar,
   ListenNowButton,
@@ -11,6 +13,7 @@ import {
 } from "@/components/RadioPlayer";
 import { submitContact } from "@/lib/contact";
 import { initAnalytics } from "@/lib/analytics";
+import { renderWithProviders } from "./utils";
 
 // jsdom não implementa reprodução de mídia; o mock evita exceções.
 const mockMedia = () => {
@@ -27,31 +30,23 @@ afterEach(() => {
   document.head.innerHTML = "";
 });
 
-describe("RadioPlayer — botão Ouvir Agora", () => {
+describe("RadioPlayer — player global no cabeçalho", () => {
   it("sem VITE_RADIO_STREAM_URL exibe 'Em breve' desabilitado e não abre o player", () => {
     vi.stubEnv("VITE_RADIO_STREAM_URL", "");
-    render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    );
+    renderWithProviders(<Home />);
 
-    const emBreve = screen.getByRole("button", { name: /Em breve/i });
+    const emBreve = screen.getAllByRole("button", { name: /Em breve/i })[0];
     expect(emBreve).toBeDisabled();
     expect(screen.queryByTestId("radio-player-bar")).not.toBeInTheDocument();
   });
 
-  it("com a URL do stream configurada, clicar em 'Ouvir Agora' abre a barra com o elemento de áudio", async () => {
+  it("com a URL do stream configurada, clicar em 'Ouvir Agora' abre a barra global com o elemento de áudio", async () => {
     vi.stubEnv("VITE_RADIO_STREAM_URL", "https://stream.example.com/live");
     mockMedia();
 
-    render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    );
+    renderWithProviders(<Home />);
 
-    fireEvent.click(screen.getByTestId("listen-now"));
+    fireEvent.click(screen.getAllByRole("button", { name: /Ouvir Agora/i })[0]);
 
     const bar = await screen.findByTestId("radio-player-bar");
     expect(bar).toBeInTheDocument();
@@ -158,6 +153,28 @@ describe("useRadioPlayer", () => {
   });
 });
 
+describe("ArticlePage — compartilhamento", () => {
+  it("copia o link do artigo com o clipboard", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    // useParams exige que o componente seja renderizado dentro de uma <Route>.
+    render(
+      <MemoryRouter initialEntries={["/artigo/2"]}>
+        <RadioPlayerProvider>
+          <Routes>
+            <Route path="/artigo/:id" element={<ArticlePage />} />
+          </Routes>
+        </RadioPlayerProvider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Copiar link/i }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+  });
+});
+
 describe("submitContact — envio real do formulário", () => {
   it("valida campos obrigatórios antes de enviar", async () => {
     vi.stubEnv("VITE_CONTACT_ENDPOINT", "");
@@ -259,11 +276,7 @@ describe("initAnalytics — Umami", () => {
 describe("Contact — mapa com fallback", () => {
   it("exibe o fallback com link para o Google Maps quando não há API key", () => {
     vi.stubEnv("VITE_FRONTEND_FORGE_API_KEY", "");
-    render(
-      <MemoryRouter>
-        <Contact />
-      </MemoryRouter>,
-    );
+    renderWithProviders(<Contact />);
 
     const mapLink = screen.getByText(/Ver no Google Maps/i);
     expect(mapLink).toBeInTheDocument();

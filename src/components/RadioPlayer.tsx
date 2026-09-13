@@ -100,7 +100,6 @@ export function useRadioPlayer(): RadioPlayerApi {
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("error", onError);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   return {
@@ -141,12 +140,12 @@ export function RadioPlayerBar({
   return (
     <div
       data-testid="radio-player-bar"
-      className="fixed bottom-0 inset-x-0 z-[60] border-t border-[#c9a227]/40 bg-[#060f1e]/95 backdrop-blur-md shadow-[0_-8px_30px_rgba(0,0,0,0.45)]"
+      className="fixed inset-x-0 bottom-0 z-[60] border-t border-brand/40 bg-card/95 backdrop-blur-md shadow-brand"
     >
       {/* Barra superior pulsante */}
-      <div className="h-0.5 bg-gradient-to-r from-transparent via-[#c9a227] to-transparent animate-pulse" />
+      <div className="h-0.5 animate-pulse bg-gradient-to-r from-transparent via-brand to-transparent" />
 
-      <div className="container mx-auto px-4 py-3 flex items-center gap-4">
+      <div className="container mx-auto flex items-center gap-4 px-4 py-3">
         <audio ref={audioRef} src={url} preload="none" />
 
         {/* Botão play/pause */}
@@ -155,30 +154,27 @@ export function RadioPlayerBar({
           onClick={togglePlay}
           aria-label={playing ? "Pausar transmissão" : "Reproduzir transmissão"}
           aria-pressed={playing}
-          className="flex-shrink-0 w-11 h-11 rounded-full bg-[#c9a227] hover:bg-[#f0c040] text-[#0b1e3d] flex items-center justify-center transition-colors shadow-lg"
+          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-colors hover:bg-accent"
         >
           {playing ? (
-            <Pause className="w-5 h-5 fill-current" />
+            <Pause className="h-5 w-5 fill-current" />
           ) : (
-            <Play className="w-5 h-5 fill-current translate-x-0.5" />
+            <Play className="h-5 w-5 translate-x-0.5 fill-current" />
           )}
         </button>
 
         {/* Identificação */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <Radio className="w-4 h-4 text-[#c9a227] flex-shrink-0" />
-            <span
-              className="text-white font-bold text-sm truncate"
-              style={{ fontFamily: "'Playfair Display', serif" }}
-            >
+            <Radio className="h-4 w-4 flex-shrink-0 text-brand" />
+            <span className="truncate text-sm font-bold text-foreground">
               Web Rádio Vitória
             </span>
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-white/60">
+            <span className="hidden items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground sm:inline-flex">
               <span
                 className={cn(
-                  "w-1.5 h-1.5 rounded-full",
-                  playing ? "bg-red-500 animate-pulse" : "bg-white/30",
+                  "h-1.5 w-1.5 rounded-full",
+                  playing ? "animate-pulse bg-live" : "bg-border",
                 )}
               />
               Ao Vivo
@@ -186,15 +182,13 @@ export function RadioPlayerBar({
           </div>
 
           {/* Visualizer */}
-          <div className="flex items-end gap-0.5 h-5 mt-1" aria-hidden>
+          <div className="mt-1 flex h-5 items-end gap-0.5" aria-hidden>
             {Array.from({ length: 24 }).map((_, i) => (
               <span
                 key={i}
                 className={cn(
                   "w-1 rounded-full transition-all duration-300",
-                  playing
-                    ? "bg-[#c9a227] wave-bar"
-                    : "bg-white/15",
+                  playing ? "bg-brand wave-bar" : "bg-border",
                 )}
                 style={{
                   height: playing ? `${8 + ((i * 7) % 18)}px` : "4px",
@@ -208,7 +202,7 @@ export function RadioPlayerBar({
           </div>
 
           {error && (
-            <p className="text-red-400 text-xs mt-0.5" role="alert">
+            <p className="mt-0.5 text-xs text-destructive" role="alert">
               Não foi possível iniciar o áudio. Verifique sua conexão e clique
               em reproduzir novamente.
             </p>
@@ -220,9 +214,9 @@ export function RadioPlayerBar({
           type="button"
           onClick={closePlayer}
           aria-label="Fechar player"
-          className="flex-shrink-0 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white flex items-center justify-center transition-colors"
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground"
         >
-          <X className="w-4 h-4" />
+          <X className="h-4 w-4" />
         </button>
       </div>
     </div>
@@ -242,10 +236,9 @@ export function ListenNowButton({ streamUrl, onOpen }: ListenNowButtonProps) {
         disabled
         aria-disabled="true"
         title="Configure VITE_RADIO_STREAM_URL no arquivo .env para liberar a transmissão"
-        className="flex items-center gap-2 bg-[#c9a227] text-[#0b1e3d] font-bold px-8 py-4 rounded-full opacity-60 cursor-not-allowed shadow-xl"
-        style={{ fontFamily: "'Lato', sans-serif" }}
+        className="inline-flex items-center gap-2 rounded-md bg-secondary px-8 py-4 text-sm font-bold text-secondary-foreground opacity-60 shadow-xl"
       >
-        <Play className="w-5 h-5" />
+        <Play className="h-5 w-5 fill-current" />
         Em breve
       </button>
     );
@@ -256,10 +249,9 @@ export function ListenNowButton({ streamUrl, onOpen }: ListenNowButtonProps) {
       type="button"
       onClick={onOpen}
       data-testid="listen-now"
-      className="flex items-center gap-2 bg-[#c9a227] hover:bg-[#f0c040] text-[#0b1e3d] font-bold px-8 py-4 rounded-full transition-all duration-200 shadow-xl hover:shadow-2xl hover:scale-105"
-      style={{ fontFamily: "'Lato', sans-serif" }}
+      className="btn-brand px-8 py-4 text-sm font-bold shadow-xl transition-all duration-200 hover:shadow-2xl"
     >
-      <Play className="w-5 h-5 fill-current" />
+      <Play className="h-5 w-5 fill-current" />
       Ouvir Agora
     </button>
   );

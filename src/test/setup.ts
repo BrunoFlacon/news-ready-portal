@@ -13,3 +13,10 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => {},
   }),
 });
+
+// jsdom não implementa rolagem; evita "Not implemented" no console.
+Object.defineProperty(window, "scrollTo", {
+  writable: true,
+  value: () => {},
+});
+Element.prototype.scrollIntoView = () => {};

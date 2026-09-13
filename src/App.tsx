@@ -1,10 +1,12 @@
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { RadioPlayerProvider } from "./contexts/RadioPlayerContext";
 import Home from "./pages/Home";
 import Index from "./pages/Index";
 import ArticlePage from "./pages/ArticlePage";
@@ -15,27 +17,58 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+/**
+ * Gerencia o scroll entre rotas: âncoras (#institucional) são alcançadas com
+ * scroll suave e qualquer outra navegação rola para o topo.
+ */
+export function ScrollManager() {
+  const { pathname, hash } = useLocation();
+
+  useEffect(() => {
+    if (hash) {
+      const target = document.getElementById(hash.slice(1));
+      if (target) {
+        target.scrollIntoView({ block: "start" });
+        return;
+      }
+    }
+    window.scrollTo(0, 0);
+  }, [pathname, hash]);
+
+  return null;
+}
+
+export function AppRoutes() {
+  return (
+    <>
+      <ScrollManager />
+      <Routes>
+        {/* Portal editorial (unificação da landing e do portal de notícias) */}
+        <Route path="/" element={<Home />} />
+        <Route path="/noticias" element={<Index />} />
+        <Route path="/artigo/:id" element={<ArticlePage />} />
+        <Route path="/contato" element={<Contact />} />
+        {/* Páginas legais para aprovação de APIs */}
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-of-service" element={<TermsOfService />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
+  );
+}
+
 const App = () => (
   <ErrorBoundary>
-    <ThemeProvider defaultTheme="light">
+    <ThemeProvider defaultTheme="dark">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
-            <Routes>
-              {/* Landing institucional da rádio (port de landpagewebradiovitoria) */}
-              <Route path="/" element={<Home />} />
-              {/* Portal de notícias */}
-              <Route path="/noticias" element={<Index />} />
-              <Route path="/artigo/:id" element={<ArticlePage />} />
-              <Route path="/contato" element={<Contact />} />
-              {/* Páginas legais para aprovação de APIs */}
-              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-              <Route path="/terms-of-service" element={<TermsOfService />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+          <RadioPlayerProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </RadioPlayerProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>

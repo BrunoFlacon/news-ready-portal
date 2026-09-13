@@ -64,6 +64,18 @@
   .shadow-brand { box-shadow: var(--shadow-brand); }
   .scrollbar-hidden { scrollbar-width: none; }
   .scrollbar-hidden::-webkit-scrollbar { display: none; }
+  /* Botão de ação dourada (marca) — variante determinística do design system */
+  .btn-brand {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-brand text-brand-foreground hover:bg-accent;
+  }
+}
+
+@layer utilities {
+  @keyframes wave {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(0.35); }
+  }
+  .wave-bar { display: inline-block; transform-origin: bottom; animation: wave 1s ease-in-out infinite; }
 }
 
 @media (prefers-reduced-motion: reduce) {

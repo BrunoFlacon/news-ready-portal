@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/Layout";
@@ -15,13 +15,31 @@ function filterByCategory(list: Article[], category: Category): Article[] {
   return list.filter((a) => a.category === category);
 }
 
+function isCategory(value: string | null): value is Category {
+  return categories.includes(value as Category);
+}
+
 const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialCategory = categories.includes(searchParams.get("categoria") as Category) ? searchParams.get("categoria") as Category : "Todas";
-  const [category, setCategory] = useState<Category>(initialCategory);
+  const categoriaParam = searchParams.get("categoria");
+
+  const [category, setCategory] = useState<Category>(() =>
+    isCategory(categoriaParam) ? categoriaParam : "Todas",
+  );
+
+  // Mantém o filtro sincronizado com a URL: navegar pelo menu do cabeçalho
+  // (que muda apenas o query string) atualiza a categoria ativa.
+  useEffect(() => {
+    setCategory(isCategory(categoriaParam) ? categoriaParam : "Todas");
+  }, [categoriaParam]);
+
   const selectCategory = (value: Category) => {
     setCategory(value);
-    value === "Todas" ? setSearchParams({}) : setSearchParams({ categoria: value });
+    if (value === "Todas") {
+      setSearchParams({});
+    } else {
+      setSearchParams({ categoria: value });
+    }
   };
 
   const filtered = useMemo(() => filterByCategory(articles, category), [category]);
