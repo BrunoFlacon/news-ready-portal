@@ -10,17 +10,17 @@ const socialLinks = [
 
 export function SiteFooter() {
   return (
-    <footer className="bg-nav text-nav-foreground">
-      <div className="container mx-auto px-4 py-10">
+    <footer className="border-t border-border bg-card text-card-foreground">
+      <div className="container py-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#c9a227] to-[#f0c040] flex items-center justify-center">
-                <Radio className="w-4 h-4 text-[#0b1e3d]" />
+              <div className="grid h-9 w-9 place-items-center rounded-md bg-brand text-brand-foreground">
+                <Radio className="h-4 w-4" />
               </div>
               <h3 className="font-serif font-bold text-lg">Web Rádio Vitória</h3>
             </div>
-            <p className="text-sm opacity-80">
+              <p className="text-sm text-muted-foreground">
               Portal de notícias com cobertura completa sobre política, tecnologia,
               entretenimento e muito mais. 24 hs adorando a Deus — Tupã, SP, Brasil.
             </p>
@@ -28,7 +28,7 @@ export function SiteFooter() {
 
           <div>
             <h4 className="font-semibold mb-3">Links Importantes</h4>
-            <ul className="space-y-2 text-sm opacity-80">
+            <ul className="space-y-2 text-sm text-muted-foreground">
               <li><Link to="/noticias" className="hover:opacity-100 transition-opacity">Notícias</Link></li>
               <li><Link to="/contato" className="hover:opacity-100 transition-opacity">Contato</Link></li>
               <li><Link to="/privacy-policy" className="hover:opacity-100 transition-opacity">Política de Privacidade</Link></li>
@@ -38,16 +38,16 @@ export function SiteFooter() {
 
           <div>
             <h4 className="font-semibold mb-3">Redes Sociais</h4>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2 text-sm text-muted-foreground">
               {socialLinks.map((social) => (
                 <a
                   key={social.label}
                   href={social.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity"
+                   className="flex items-center gap-2 hover:text-brand transition-colors"
                 >
-                  <span className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center">
+                  <span className="grid h-7 w-7 place-items-center rounded-sm bg-secondary">
                     {social.icon}
                   </span>
                   {social.label}
@@ -57,7 +57,7 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <div className="border-t border-nav-foreground/20 mt-8 pt-6 text-center text-sm opacity-60">
+        <div className="mt-8 border-t border-border pt-6 text-center text-sm text-muted-foreground">
           © {new Date().getFullYear()} Web Rádio Vitória. Todos os direitos reservados.
         </div>
       </div>
