@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from "react";
 import {
   Captions,
   Gauge,
@@ -32,6 +39,54 @@ const QUALITY_LABELS: Record<WatchQuality, string> = {
 
 const SPEED_STEPS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
+const PLAYER_PREFS_KEY = "radio.watch.player";
+
+/** Preferências persistidas da barra do player (volume, velocidade, etc.). */
+interface PlayerPrefs {
+  volume: number;
+  muted: boolean;
+  speed: number;
+  quality: WatchQuality;
+  theater: boolean;
+}
+
+const DEFAULT_PREFS: PlayerPrefs = { volume: 0.85, muted: false, speed: 1, quality: "auto", theater: false };
+
+function loadPlayerPrefs(): PlayerPrefs {
+  try {
+    const raw = window.localStorage.getItem(PLAYER_PREFS_KEY);
+    if (!raw) {
+      return DEFAULT_PREFS;
+    }
+    const parsed = JSON.parse(raw) as Partial<PlayerPrefs>;
+    return {
+      volume:
+        typeof parsed.volume === "number" && parsed.volume >= 0 && parsed.volume <= 1
+          ? parsed.volume
+          : DEFAULT_PREFS.volume,
+      muted: parsed.muted === true,
+      speed:
+        typeof parsed.speed === "number" && SPEED_STEPS.includes(parsed.speed)
+          ? parsed.speed
+          : DEFAULT_PREFS.speed,
+      quality: QUALITY_LEVELS.includes(parsed.quality as WatchQuality)
+        ? (parsed.quality as WatchQuality)
+        : DEFAULT_PREFS.quality,
+      theater: parsed.theater === true,
+    };
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
+
+function savePlayerPrefs(prefs: PlayerPrefs) {
+  try {
+    window.localStorage.setItem(PLAYER_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // Armazenamento indisponível (privado/quota): segue sem persistir.
+  }
+}
+
 const leadingZero = new Intl.NumberFormat(undefined, { minimumIntegerDigits: 2 });
 
 function formatDuration(time: number) {
@@ -49,8 +104,6 @@ function formatDuration(time: number) {
 /**
  * Qualidade "Auto": escolhe a melhor resolução pela velocidade da conexão
  * (Network Information API) e reduz automaticamente quando o vídeo trava.
- * Rendições reais exigem fontes multi-arquivo ou HLS; com uma única fonte,
- * a seleção fica registrada e aplicada quando houver qualidades disponíveis.
  */
 function resolveAutoQuality(): WatchQuality {
   const connection = (navigator as Navigator & { connection?: { downlink?: number } }).connection;
@@ -69,6 +122,61 @@ function degradeQuality(level: WatchQuality): WatchQuality {
   return order[Math.min(index + 1, order.length - 1)];
 }
 
+/* -------------------------------------------------------------------------- */
+/* Botão de controle com texto explicativo (tooltip)                          */
+/* -------------------------------------------------------------------------- */
+
+interface ControlButtonProps {
+  label: string;
+  tooltip: string;
+  pressed?: boolean;
+  hasMenu?: boolean;
+  expanded?: boolean;
+  onClick: () => void;
+  className?: string;
+  children: ReactNode;
+}
+
+function ControlButton({
+  label,
+  tooltip,
+  pressed,
+  hasMenu,
+  expanded,
+  onClick,
+  className,
+  children,
+}: ControlButtonProps) {
+  return (
+    <div className="group/tb relative">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={label}
+        aria-pressed={pressed}
+        aria-haspopup={hasMenu ? "menu" : undefined}
+        aria-expanded={hasMenu ? expanded : undefined}
+        className={cn(
+          "flex h-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
+          className ?? "w-9",
+        )}
+      >
+        {children}
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-neutral-900/95 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover/tb:opacity-100 group-focus-within/tb:opacity-100"
+      >
+        {tooltip}
+      </span>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Player estilo YouTube                                                       */
+/* -------------------------------------------------------------------------- */
+
 interface YouTubePlayerProps {
   src: string;
   poster?: string;
@@ -82,12 +190,8 @@ interface YouTubePlayerProps {
   onEnded: () => void;
 }
 
-/**
- * Player estilo YouTube: reproduz em tela cheia no banner gigante com barra
- * de controles própria (timeline, play/pause, volume, legendas, velocidade,
- * qualidade, teatro, picture-in-picture e tela cheia). Portado do clone
- * anexado em src/clone-youtube-player, convertido para React.
- */
+type OpenMenu = "speed" | "quality" | "view" | null;
+
 export function YouTubePlayer({
   src,
   poster,
@@ -98,6 +202,9 @@ export function YouTubePlayer({
   onToggleCc,
   onEnded,
 }: YouTubePlayerProps) {
+  const initialPrefs = useRef(loadPlayerPrefs());
+  const prefs = initialPrefs.current;
+
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -109,13 +216,16 @@ export function YouTubePlayer({
   const [progress, setProgress] = useState(0);
   const [preview, setPreview] = useState(0);
   const [scrubbing, setScrubbing] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [volume, setVolume] = useState(0.85);
-  const [speed, setSpeed] = useState(1);
-  const [qualityOpen, setQualityOpen] = useState(false);
-  const [quality, setQuality] = useState<WatchQuality>("auto");
-  const [activeQuality, setActiveQuality] = useState<WatchQuality>("1080");
-  const [theater, setTheater] = useState(false);
+  const [muted, setMuted] = useState(prefs.muted);
+  const [volume, setVolume] = useState(prefs.volume);
+  const [volumeOpen, setVolumeOpen] = useState(false);
+  const [speed, setSpeed] = useState(prefs.speed);
+  const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
+  const [quality, setQuality] = useState<WatchQuality>(prefs.quality);
+  const [activeQuality, setActiveQuality] = useState<WatchQuality>(
+    prefs.quality === "auto" ? resolveAutoQuality() : prefs.quality,
+  );
+  const [theater, setTheater] = useState(prefs.theater);
   const [fullscreen, setFullscreen] = useState(false);
   const [miniPlayer, setMiniPlayer] = useState(false);
 
@@ -133,6 +243,11 @@ export function YouTubePlayer({
   previewRef.current = preview;
   const scrubbingWasPausedRef = useRef(false);
 
+  // Salva as preferências da barra (volume, mudo, velocidade, qualidade, teatro).
+  useEffect(() => {
+    savePlayerPrefs({ volume, muted, speed, quality, theater });
+  }, [volume, muted, speed, quality, theater]);
+
   // Aplica preferências de áudio e velocidade à mídia (inclusive em trocas).
   useEffect(() => {
     const video = videoRef.current;
@@ -144,16 +259,42 @@ export function YouTubePlayer({
     video.playbackRate = speed;
   }, [muted, volume, speed]);
 
-  // Reproduz automaticamente e volta à qualidade automática quando o item muda.
+  /**
+   * Reproduz com proteção contra autoplay bloqueado (ex.: iframe do preview):
+   * se o navegador recusar tocar com áudio, inicia mudo e segue tocando.
+   */
+  const attemptPlay = useCallback((video: HTMLVideoElement) => {
+    const started = video.play();
+    if (started !== undefined) {
+      return started.catch(() => {
+        video.muted = true;
+        setMuted(true);
+        setVolumeOpen(true);
+        return video.play().catch(() => undefined);
+      });
+    }
+    return started;
+  }, []);
+
+  // Autoplay: volta ao início e retoma a qualidade automática quando o item muda.
   useEffect(() => {
     const video = videoRef.current;
     if (!video) {
       return;
     }
     setPaused(false);
-    setActiveQuality(resolveAutoQuality());
-    void video.play().catch(() => undefined);
-  }, [src]);
+    setActiveQuality(qualityRef.current === "auto" ? resolveAutoQuality() : qualityRef.current);
+    void attemptPlay(video);
+  }, [src, attemptPlay]);
+
+  // Esconde o campo de volume ~1,6s depois de usá-lo (hover ainda o revela).
+  useEffect(() => {
+    if (!volumeOpen) {
+      return;
+    }
+    const timer = setTimeout(() => setVolumeOpen(false), 1600);
+    return () => clearTimeout(timer);
+  }, [volumeOpen, volume]);
 
   const getTimelinePosition = useCallback((clientX: number) => {
     const timeline = timelineRef.current;
@@ -164,11 +305,14 @@ export function YouTubePlayer({
     return Math.min(Math.max(0, clientX - rect.left), rect.width) / rect.width || 0;
   }, []);
 
-  const handlePreview = (clientX: number) => {
-    const position = getTimelinePosition(clientX);
-    previewRef.current = position;
-    setPreview(position);
-  };
+  const handlePreview = useCallback(
+    (clientX: number) => {
+      const position = getTimelinePosition(clientX);
+      previewRef.current = position;
+      setPreview(position);
+    },
+    [getTimelinePosition],
+  );
 
   const skip = useCallback((seconds: number) => {
     const video = videoRef.current;
@@ -193,13 +337,20 @@ export function YouTubePlayer({
       return;
     }
     if (pausedRef.current) {
-      void video.play().catch(() => undefined);
+      void attemptPlay(video);
       setPaused(false);
     } else {
       video.pause();
       setPaused(true);
     }
-  }, []);
+  }, [attemptPlay]);
+
+  // Clique no player (fora dos controles): fecha menus e dá play/pause.
+  const handlePlayerClick = useCallback(() => {
+    setOpenMenu(null);
+    setVolumeOpen(false);
+    togglePlay();
+  }, [togglePlay]);
 
   const toggleMute = useCallback(() => {
     if (mutedRef.current) {
@@ -216,6 +367,7 @@ export function YouTubePlayer({
     const value = Number(event.target.value);
     setVolume(value);
     setMuted(value === 0);
+    setVolumeOpen(true);
   };
 
   const toggleFullscreen = useCallback(() => {
@@ -224,9 +376,9 @@ export function YouTubePlayer({
       return;
     }
     if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => undefined);
+      void document.exitFullscreen?.().catch(() => undefined);
     } else {
-      void container.requestFullscreen().catch(() => undefined);
+      void container.requestFullscreen?.().catch(() => undefined);
     }
   }, []);
 
@@ -236,23 +388,21 @@ export function YouTubePlayer({
       return;
     }
     if (document.pictureInPictureElement) {
-      void document.exitPictureInPicture().catch(() => undefined);
+      void document.exitPictureInPicture?.().catch(() => undefined);
     } else {
-      void video.requestPictureInPicture().catch(() => undefined);
+      void video.requestPictureInPicture?.().catch(() => undefined);
     }
   }, []);
 
-  const cycleSpeed = () => {
-    setSpeed((current) => {
-      const index = SPEED_STEPS.indexOf(current);
-      return SPEED_STEPS[(index + 1) % SPEED_STEPS.length];
-    });
+  const toggleMenu = (menu: Exclude<OpenMenu, null>) => {
+    setOpenMenu((current) => (current === menu ? null : menu));
+    setVolumeOpen(false);
   };
 
   const selectQuality = (level: WatchQuality) => {
     setQuality(level);
     setActiveQuality(level === "auto" ? resolveAutoQuality() : level);
-    setQualityOpen(false);
+    setOpenMenu(null);
   };
 
   const startScrubbing = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -262,6 +412,8 @@ export function YouTubePlayer({
     }
     scrubbingWasPausedRef.current = video.paused;
     setScrubbing(true);
+    setOpenMenu(null);
+    setVolumeOpen(false);
     video.pause();
     handlePreview(event.clientX);
   };
@@ -277,12 +429,12 @@ export function YouTubePlayer({
       video.currentTime = position * video.duration;
     }
     if (!scrubbingWasPausedRef.current) {
-      void video.play().catch(() => undefined);
+      void attemptPlay(video);
       setPaused(false);
     }
     setPreview(0);
     setScrubbing(false);
-  }, []);
+  }, [attemptPlay]);
 
   // Arrastar no timeline funciona mesmo com o cursor fora do elemento.
   useEffect(() => {
@@ -300,7 +452,7 @@ export function YouTubePlayer({
   }, [scrubbing, endScrubbing, handlePreview, getTimelinePosition]);
 
   // Atalhos de teclado do YouTube: espaço/k play, f tela cheia, t teatro,
-  // i picture-in-picture, m mudo, setas/j/l avançar/voltar, c legendas.
+  // i picture-in-picture, m mudo, j/l/setas avançar/voltar, c legendas, Esc fecha menus.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -308,6 +460,11 @@ export function YouTubePlayer({
         return;
       }
       if (event.key === " " && target instanceof HTMLButtonElement) {
+        return;
+      }
+      if (event.key === "Escape") {
+        setOpenMenu(null);
+        setVolumeOpen(false);
         return;
       }
       switch (event.key.toLowerCase()) {
@@ -361,14 +518,43 @@ export function YouTubePlayer({
   }, [src]);
 
   const controlsVisible = showControls || paused;
+  const qualityLabel =
+    quality === "auto" ? `Auto (${QUALITY_LABELS[activeQuality]})` : QUALITY_LABELS[quality];
+
+  const viewActions: Array<{
+    key: string;
+    label: string;
+    icon: typeof RectangleHorizontal;
+    active: boolean;
+    run: () => void;
+  }> = [
+    {
+      key: "theater",
+      label: "Teatro",
+      icon: RectangleVertical,
+      active: theater,
+      run: () => setTheater((value) => !value),
+    },
+    {
+      key: "pip",
+      label: "Mini player",
+      icon: PictureInPicture2,
+      active: miniPlayer,
+      run: togglePictureInPicture,
+    },
+    { key: "fullscreen", label: "Tela cheia", icon: Maximize, active: fullscreen, run: toggleFullscreen },
+  ];
 
   return (
     <div
       ref={containerRef}
       data-testid="youtube-player"
+      onClick={handlePlayerClick}
       className={cn(
-        "group/player relative flex h-full w-full items-center justify-center overflow-hidden",
-        orientation === "vertical" ? "aspect-[9/16] h-full w-auto rounded-lg bg-black shadow-2xl" : "rounded-lg",
+        "group/player relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden",
+        orientation === "vertical"
+          ? "aspect-[9/16] h-full w-auto rounded-lg bg-black shadow-2xl"
+          : "rounded-lg",
         scrubbing && "scrubbing",
         paused && "paused",
         fullscreen && "full-screen",
@@ -382,7 +568,6 @@ export function YouTubePlayer({
         poster={poster}
         playsInline
         preload="auto"
-        onClick={togglePlay}
         onPlay={() => setPaused(false)}
         onPause={() => setPaused(true)}
         onTimeUpdate={(event) => {
@@ -401,7 +586,7 @@ export function YouTubePlayer({
         onPlaying={() => setBuffering(false)}
         onCanPlay={() => setBuffering(false)}
         className={cn(
-          "relative z-[1] h-full w-full",
+          "pointer-events-none relative z-[1] h-full w-full",
           orientation === "horizontal"
             ? theater
               ? "object-contain"
@@ -441,11 +626,12 @@ export function YouTubePlayer({
 
       {/* Barra de controles inferior (clone do YouTube) */}
       <div
+        onClick={(event) => event.stopPropagation()}
         className={cn(
           "absolute inset-x-0 bottom-0 z-[5] transition-opacity duration-150",
           controlsVisible
             ? "opacity-100"
-            : "pointer-events-none opacity-0 group-hover/player:pointer-events-auto group-hover/player:opacity-100",
+            : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100",
         )}
       >
         <div
@@ -479,87 +665,132 @@ export function YouTubePlayer({
         </div>
 
         {/* Linha de controles */}
-        <div className="relative z-[1] flex items-center gap-1 px-2 pb-2 text-white">
-          <button
-            type="button"
+        <div className="relative z-[1] flex items-center gap-0.5 px-2 pb-2 text-white">
+          <ControlButton
+            label={paused ? "Reproduzir vídeo" : "Pausar vídeo"}
+            tooltip={paused ? "Reproduzir (K)" : "Pausar (K)"}
             onClick={togglePlay}
-            aria-label={paused ? "Reproduzir vídeo" : "Pausar vídeo"}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
           >
             {paused ? <Play className="h-5 w-5 fill-current" /> : <Pause className="h-5 w-5 fill-current" />}
-          </button>
+          </ControlButton>
 
-          <div className="whitespace-nowrap px-1 text-xs font-medium tabular-nums">
+          <div className="min-w-0 whitespace-nowrap px-1.5 text-xs font-medium tabular-nums">
             {formatDuration(currentTime)} / {formatDuration(duration)}
           </div>
 
           <div className="flex-1" />
 
-          {/* Volume no canto direito, como pedido */}
-          <button
-            type="button"
-            onClick={toggleMute}
-            aria-label={muted ? "Ativar som do vídeo" : "Silenciar vídeo"}
-            aria-pressed={muted}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
-          >
-            {muted ? (
-              <VolumeX className="h-5 w-5" />
-            ) : volume >= 0.5 ? (
-              <Volume2 className="h-5 w-5" />
-            ) : (
-              <Volume1 className="h-5 w-5" />
-            )}
-          </button>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={muted ? 0 : volume}
-            onChange={onVolumeInput}
-            aria-label="Volume do vídeo"
-            className="h-1.5 w-16 cursor-pointer accent-live lg:w-24"
-          />
+          {/* Volume: alto-falante + campo que abre para cima no hover/toque e some depois de usar */}
+          <div className="group/vol relative flex items-center">
+            <ControlButton
+              label={muted ? "Ativar som do vídeo" : "Silenciar vídeo"}
+              tooltip={muted ? "Ativar som (M)" : "Silenciar (M)"}
+              pressed={muted}
+              onClick={toggleMute}
+            >
+              {muted ? (
+                <VolumeX className="h-5 w-5" />
+              ) : volume >= 0.5 ? (
+                <Volume2 className="h-5 w-5" />
+              ) : (
+                <Volume1 className="h-5 w-5" />
+              )}
+            </ControlButton>
+            <div
+              data-testid="volume-popover"
+              className={cn(
+                "absolute bottom-full right-0 mb-2 flex items-center gap-2 rounded-md bg-neutral-900/95 px-3 py-2 shadow-xl",
+                "sm:pointer-events-none sm:opacity-0 sm:transition-all sm:duration-150 sm:group-hover/vol:pointer-events-auto sm:group-hover/vol:opacity-100",
+                volumeOpen && "sm:pointer-events-auto sm:opacity-100",
+                "max-sm:static max-sm:mb-0 max-sm:rounded-none max-sm:bg-transparent max-sm:px-0 max-sm:py-0 max-sm:shadow-none",
+              )}
+            >
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={muted ? 0 : volume}
+                onChange={onVolumeInput}
+                aria-label="Volume do vídeo"
+                className="h-1.5 w-24 cursor-pointer accent-live lg:w-32"
+              />
+              <span className="w-9 text-right text-[10px] font-bold tabular-nums text-white">
+                {muted ? 0 : Math.round(volume * 100)}%
+              </span>
+            </div>
+          </div>
 
-          <button
-            type="button"
+          <ControlButton
+            label="Legendas do vídeo"
+            tooltip={cc ? "Legendas ativadas (C)" : "Legendas desativadas (C)"}
+            pressed={cc}
             onClick={onToggleCc}
-            aria-label="Legendas do vídeo"
-            aria-pressed={cc}
-            className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-full transition-colors",
-              cc ? "text-brand" : "text-white hover:bg-white/15",
-            )}
+            className={cn("w-9", cc && "text-brand")}
           >
             <Captions className="h-5 w-5" />
-          </button>
+          </ControlButton>
 
-          <button
-            type="button"
-            onClick={cycleSpeed}
-            aria-label="Velocidade de reprodução"
-            className="flex h-9 items-center justify-center rounded-full px-2 text-xs font-bold text-white transition-colors hover:bg-white/15"
-          >
-            {speed}x
-          </button>
-
-          {/* Seletor de qualidade (padrão: Auto — 1080p em conexões boas) */}
+          {/* Velocidade de reprodução (menu para cima) */}
           <div className="relative">
-            <button
-              type="button"
-              onClick={() => setQualityOpen((value) => !value)}
-              aria-label="Qualidade do vídeo"
-              aria-haspopup="menu"
-              aria-expanded={qualityOpen}
-              className="flex h-9 items-center justify-center gap-1 rounded-full px-2 text-white transition-colors hover:bg-white/15"
+            <ControlButton
+              label="Velocidade de reprodução"
+              tooltip="Velocidade de reprodução"
+              hasMenu
+              expanded={openMenu === "speed"}
+              onClick={() => toggleMenu("speed")}
+              className="w-auto px-2"
+            >
+              <span className="text-xs font-bold">{speed}x</span>
+            </ControlButton>
+            {openMenu === "speed" && (
+              <div
+                role="menu"
+                data-testid="speed-menu"
+                className="absolute bottom-10 right-0 z-30 w-36 overflow-hidden rounded-md border border-border bg-background p-1 shadow-2xl"
+              >
+                <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Velocidade
+                </p>
+                {SPEED_STEPS.map((step) => (
+                  <button
+                    key={step}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={speed === step}
+                    onClick={() => {
+                      setSpeed(step);
+                      setOpenMenu(null);
+                    }}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-sm px-3 py-1.5 text-left text-xs",
+                      speed === step
+                        ? "bg-brand font-bold text-brand-foreground"
+                        : "text-foreground hover:bg-secondary",
+                    )}
+                  >
+                    {step}x
+                    {step === 1 && <span className="text-[10px] opacity-70">Normal</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Qualidade (menu para cima; padrão Auto — 1080p em conexões boas) */}
+          <div className="relative">
+            <ControlButton
+              label="Qualidade do vídeo"
+              tooltip="Qualidade do vídeo"
+              hasMenu
+              expanded={openMenu === "quality"}
+              onClick={() => toggleMenu("quality")}
+              className="w-auto gap-1 px-2"
             >
               <Gauge className="h-4 w-4" />
-              <span className="text-[10px] font-bold">
-                {quality === "auto" ? `Auto (${QUALITY_LABELS[activeQuality]})` : QUALITY_LABELS[quality]}
-              </span>
-            </button>
-            {qualityOpen && (
+              <span className="text-[10px] font-bold">{qualityLabel}</span>
+            </ControlButton>
+            {openMenu === "quality" && (
               <div
                 role="menu"
                 data-testid="quality-menu"
@@ -577,7 +808,9 @@ export function YouTubePlayer({
                     onClick={() => selectQuality(level)}
                     className={cn(
                       "flex w-full items-center justify-between gap-2 rounded-sm px-3 py-1.5 text-left text-xs",
-                      quality === level ? "bg-brand font-bold text-brand-foreground" : "text-foreground hover:bg-secondary",
+                      quality === level
+                        ? "bg-brand font-bold text-brand-foreground"
+                        : "text-foreground hover:bg-secondary",
                     )}
                   >
                     {QUALITY_LABELS[level]}
@@ -588,34 +821,50 @@ export function YouTubePlayer({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setTheater((value) => !value)}
-            aria-label="Alternar modo teatro"
-            aria-pressed={theater}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
-          >
-            {theater ? <RectangleVertical className="h-5 w-5" /> : <RectangleHorizontal className="h-5 w-5" />}
-          </button>
-
-          <button
-            type="button"
-            onClick={togglePictureInPicture}
-            aria-label="Mini player (picture-in-picture)"
-            aria-pressed={miniPlayer}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
-          >
-            <PictureInPicture2 className="h-5 w-5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            aria-label={fullscreen ? "Sair da tela cheia" : "Tela cheia"}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
-          >
-            {fullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
-          </button>
+          {/* Exibição: teatro, mini player e tela cheia em um só botão (menu para cima) */}
+          <div className="relative">
+            <ControlButton
+              label="Exibição do vídeo"
+              tooltip="Tamanho da tela"
+              hasMenu
+              expanded={openMenu === "view"}
+              onClick={() => toggleMenu("view")}
+            >
+              <RectangleHorizontal className="h-5 w-5" />
+            </ControlButton>
+            {openMenu === "view" && (
+              <div
+                role="menu"
+                data-testid="view-menu"
+                className="absolute bottom-10 right-0 z-30 w-44 overflow-hidden rounded-md border border-border bg-background p-1 shadow-2xl"
+              >
+                <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Exibição
+                </p>
+                {viewActions.map((action) => (
+                  <button
+                    key={action.key}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={action.active}
+                    onClick={() => {
+                      action.run();
+                      setOpenMenu(null);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-sm px-3 py-1.5 text-left text-xs",
+                      action.active
+                        ? "bg-brand font-bold text-brand-foreground"
+                        : "text-foreground hover:bg-secondary",
+                    )}
+                  >
+                    <action.icon className="h-4 w-4" />
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

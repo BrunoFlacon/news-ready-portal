@@ -569,7 +569,7 @@ describe("Home — player imersivo no banner gigante", () => {
     expect(screen.getByRole("button", { name: /Pausar vídeo/i })).toBeInTheDocument();
   });
 
-  it("altera a velocidade de reprodução em ciclo e aplica na mídia", () => {
+  it("seleciona a velocidade de reprodução no menu e aplica na mídia", () => {
     mockMedia();
     renderWithProviders(<Home />);
 
@@ -580,8 +580,12 @@ describe("Home — player imersivo no banner gigante", () => {
     );
     const media = screen.getByTestId("watch-media") as HTMLVideoElement;
 
-    expect(screen.getByRole("button", { name: /Velocidade de reprodução/i })).toHaveTextContent("1x");
-    fireEvent.click(screen.getByRole("button", { name: /Velocidade de reprodução/i }));
+    const speedButton = screen.getByRole("button", { name: /Velocidade de reprodução/i });
+    expect(speedButton).toHaveTextContent("1x");
+
+    fireEvent.click(speedButton);
+    expect(screen.getByTestId("speed-menu")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /1\.25x/i }));
     expect(screen.getByRole("button", { name: /Velocidade de reprodução/i })).toHaveTextContent("1.25x");
     expect(media.playbackRate).toBe(1.25);
   });
@@ -642,6 +646,95 @@ describe("Home — player imersivo no banner gigante", () => {
     fireEvent(window, new MouseEvent("pointerup", { bubbles: true, clientX: 100 }));
     expect(screen.getByTestId("youtube-player")).not.toHaveClass("scrubbing");
     expect(seeked).toBeCloseTo(50);
+  });
+
+  it("ao tocar no vídeo, o player dá play/pause", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
+      }),
+    );
+
+    const player = screen.getByTestId("youtube-player");
+    fireEvent.click(player);
+    expect(screen.getByRole("button", { name: /Reproduzir vídeo/i })).toBeInTheDocument();
+
+    fireEvent.click(player);
+    expect(screen.getByRole("button", { name: /Pausar vídeo/i })).toBeInTheDocument();
+  });
+
+  it("lembra o volume escolhido ao fechar e reabrir o player", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
+      }),
+    );
+    const slider = screen.getByRole("slider", { name: /Volume do vídeo/i }) as HTMLInputElement;
+    fireEvent.change(slider, { target: { value: "0.4" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /Fechar player/i }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
+      }),
+    );
+
+    const media = screen.getByTestId("watch-media") as HTMLVideoElement;
+    expect(media.volume).toBeCloseTo(0.4);
+    expect(screen.getByRole("slider", { name: /Volume do vídeo/i })).toHaveValue("0.4");
+  });
+
+  it("esconde o campo de volume automaticamente depois de usar", () => {
+    vi.useFakeTimers();
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
+      }),
+    );
+    const popover = screen.getByTestId("volume-popover");
+    expect(popover.className).not.toContain("sm:opacity-100");
+
+    fireEvent.change(screen.getByRole("slider", { name: /Volume do vídeo/i }), {
+      target: { value: "0.6" },
+    });
+    expect(popover.className).toContain("sm:opacity-100");
+
+    act(() => {
+      vi.advanceTimersByTime(1800);
+    });
+    expect(popover.className).not.toContain("sm:opacity-100");
+  });
+
+  it("reúne teatro, mini player e tela cheia em um único botão de exibição", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
+      }),
+    );
+    const media = screen.getByTestId("watch-media") as HTMLVideoElement;
+
+    const viewButton = screen.getByRole("button", { name: /Exibição do vídeo/i });
+    fireEvent.click(viewButton);
+    expect(screen.getByTestId("view-menu")).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /Teatro/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /Mini player/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /Tela cheia/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /Teatro/i }));
+    expect(viewButton).toHaveAttribute("aria-expanded", "false");
+    expect(media.className).toContain("object-contain");
   });
 });
 
