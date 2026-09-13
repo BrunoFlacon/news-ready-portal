@@ -53,6 +53,9 @@ export default {
         },
         "section-label": "hsl(var(--section-label))",
         highlight: "hsl(var(--highlight))",
+        brand: { DEFAULT: "hsl(var(--brand))", foreground: "hsl(var(--brand-foreground))" },
+        live: { DEFAULT: "hsl(var(--live))", foreground: "hsl(var(--live-foreground))" },
+        overlay: { foreground: "hsl(var(--overlay-foreground))", muted: "hsl(var(--overlay-muted))" },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -65,8 +68,8 @@ export default {
         },
       },
       fontFamily: {
-        serif: ['Merriweather', 'Georgia', 'serif'],
-        sans: ['Source Sans 3', 'system-ui', 'sans-serif'],
+        serif: ['Libre Baskerville', 'Georgia', 'serif'],
+        sans: ['IBM Plex Sans', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         lg: "var(--radius)",
