@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 describe("Home (área da rádio — separada das notícias)", () => {
-  it("renderiza as seções da rádio: hero, programação, podcasts, entretenimento, vídeos e lives", () => {
+  it("renderiza as seções da rádio: hero, programação, podcasts e entretenimento", () => {
     renderWithProviders(<Home />);
 
     // Hero da rádio (o rodapé repete a marca em heading próprio)
@@ -33,13 +33,30 @@ describe("Home (área da rádio — separada das notícias)", () => {
     expect(screen.getByRole("heading", { name: /Reels da redação/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Stories em destaque/i })).toBeInTheDocument();
 
-    // Vídeos e lives separados em duas faixas
-    expect(screen.getByRole("heading", { name: /Vídeos e lives/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Vídeos" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Lives" })).toBeInTheDocument();
+    // A seção de vídeos e lives saiu: o conteúdo migrou para o banner gigante.
+    expect(
+      screen.queryByRole("heading", { name: /Vídeos e lives/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Vídeos" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Lives" })).not.toBeInTheDocument();
 
     // A área institucional não aparece na home sem o hash #institucional
     expect(screen.queryByText("Área institucional")).not.toBeInTheDocument();
+  });
+
+  it("exibe a grade dinâmica da programação com apresentadores e horários", () => {
+    renderWithProviders(<Home />);
+
+    const grid = screen.getByTestId("schedule-grid");
+    expect(
+      within(grid).getByRole("button", { name: /Culto de adoração ao vivo/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(grid).getByRole("button", { name: /Programa da manhã/i }),
+    ).toBeInTheDocument();
+    // Cada linha mostra o apresentador e o horário da grade.
+    expect(within(grid).getAllByText(/Apresentador\(a\):/i).length).toBeGreaterThan(0);
+    expect(within(grid).getByText("19h")).toBeInTheDocument();
   });
 
   it("renderiza a área institucional apenas ao acessar com o hash #institucional", () => {

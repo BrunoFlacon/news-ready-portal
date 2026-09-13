@@ -38,7 +38,7 @@ describe("RadioPlayer — player global no cabeçalho", () => {
     renderWithProviders(<Home />);
 
     expect(screen.getByText("Em breve live")).toBeInTheDocument();
-    expect(screen.getByText("Domingo, às 19h")).toBeInTheDocument();
+    expect(screen.getByText("Domingo • 19h")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Ouvir Agora/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Pausar/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId("radio-player-bar")).not.toBeInTheDocument();
@@ -348,6 +348,164 @@ describe("Podcast — controles da barra inferior", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Voltar 15 segundos/i }));
     expect(audio.currentTime).toBe(40);
+  });
+});
+
+describe("Home — player imersivo no banner gigante", () => {
+  it("abre o overlay no banner ao escolher um reel e exibe o vídeo vertical com legenda", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Assistir Inteligência artificial na saúde/i,
+      }),
+    );
+
+    expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
+    const media = screen.getByTestId("watch-media");
+    expect(media).toBeInTheDocument();
+    expect(media).toHaveAttribute("src", expect.stringContaining("?v=reel-1"));
+    // Reels/stories entram centralizados em 9:16.
+    expect(media.parentElement).toHaveClass("aspect-[9/16]");
+    // Legenda do áudio aparece na lateral direita.
+    expect(screen.getAllByText(/Legenda do áudio/i).length).toBeGreaterThan(0);
+  });
+
+  it("reproduz a live no banner ao clicar na linha da programação", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    const grid = screen.getByTestId("schedule-grid");
+    fireEvent.click(
+      within(grid).getByRole("button", { name: /Culto de adoração ao vivo/i }),
+    );
+
+    expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
+    expect(screen.getByTestId("watch-media")).toHaveAttribute(
+      "src",
+      expect.stringContaining("?v=live-now-1"),
+    );
+  });
+
+  it("ao terminar, alterna próximo/anúncio premium/grade e reproduz automaticamente em 3 segundos", () => {
+    vi.useFakeTimers();
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Assistir Inteligência artificial na saúde/i,
+      }),
+    );
+    const media = screen.getByTestId("watch-media") as HTMLVideoElement;
+    fireEvent(media, new Event("ended"));
+
+    // Transição: manchete + capa do próximo vídeo recomendado (story-3).
+    expect(screen.getByTestId("watch-transition")).toBeInTheDocument();
+    expect(screen.getByTestId("watch-next-card")).toBeInTheDocument();
+    expect(screen.getByText(/Cultura em destaque/i)).toBeInTheDocument();
+
+    // Depois de 1s: anúncio da assinatura premium.
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(screen.getByTestId("watch-premium-ad")).toBeInTheDocument();
+
+    // Passado mais 1s: grade com a próxima live e o próximo programa.
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(screen.getByTestId("watch-schedule-ad")).toBeInTheDocument();
+    expect(screen.getByText(/Próxima live/i)).toBeInTheDocument();
+    expect(screen.getByText(/Domingo às 19h/i)).toBeInTheDocument();
+
+    // No 3º segundo o próximo da recomendação (story-3) começa sozinho.
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(screen.getByTestId("watch-media")).toHaveAttribute(
+      "src",
+      expect.stringContaining("?v=story-3"),
+    );
+  });
+
+  it("fecha o overlay ao clicar em fechar", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Assistir Inteligência artificial na saúde/i,
+      }),
+    );
+    expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Fechar player/i }));
+    expect(screen.queryByTestId("watch-overlay")).not.toBeInTheDocument();
+  });
+});
+
+describe("Home — área premium", () => {
+  it("abre o painel ao escolher um podcast na íntegra (só data, hora, nome e apresentador)", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Assinar para ouvir Boletim de notícias da semana/i,
+      }),
+    );
+
+    const panel = screen.getByTestId("premium-panel");
+    expect(panel).toBeInTheDocument();
+    expect(
+      within(panel).getByText(/Boletim de notícias da semana/i),
+    ).toBeInTheDocument();
+    expect(within(panel).getByText(/Rodrigo Alves/i)).toBeInTheDocument();
+    expect(within(panel).getByText(/Quinta feira • 7h/i)).toBeInTheDocument();
+    expect(
+      within(panel).getByRole("button", { name: /Assinar a área premium/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("reapresentações de lives na grade mostram dados básicos com a marca premium", () => {
+    renderWithProviders(<Home />);
+
+    const grid = screen.getByTestId("schedule-grid");
+    const replay = within(grid).getByRole("button", {
+      name: /Reapresentação — Culto da semana/i,
+    });
+    expect(replay).toHaveTextContent("Sábado");
+    expect(replay).toHaveTextContent("9h");
+    expect(replay).toHaveTextContent("Equipe Web Rádio Vitória");
+    expect(within(replay).getByText("Premium")).toBeInTheDocument();
+  });
+});
+
+describe("Menu — borda ativa apenas no item clicado", () => {
+  it("na home sem hash, Início está ativo e Institucional não", () => {
+    renderWithProviders(<Home />);
+
+    const nav = screen.getByRole("navigation", { name: /Navegação principal/i });
+    expect(
+      within(nav).getByRole("link", { name: "Início" }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      within(nav).getByRole("link", { name: "Institucional" }),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("com #institucional, Institucional está ativo e Início não", () => {
+    renderWithProviders(<Home />, { route: "/#institucional" });
+
+    const nav = screen.getByRole("navigation", { name: /Navegação principal/i });
+    expect(
+      within(nav).getByRole("link", { name: "Institucional" }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      within(nav).getByRole("link", { name: "Início" }),
+    ).not.toHaveAttribute("aria-current");
   });
 });
 

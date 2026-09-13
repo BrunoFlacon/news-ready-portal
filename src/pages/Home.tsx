@@ -1,208 +1,499 @@
 import { Link, useLocation } from "react-router-dom";
-import { ArrowRight, Heart, Mic2, Newspaper, Pause, Play, Radio, Users, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  Crown,
+  Heart,
+  Info,
+  Lock,
+  Mic2,
+  Newspaper,
+  Pause,
+  Play,
+  Radio,
+  Users,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { cn } from "@/lib/utils";
 import { Layout } from "@/components/Layout";
 import { MediaRail } from "@/components/MediaRail";
 import { Button } from "@/components/ui/button";
 import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
+import { extractPalette, type AmbientPalette } from "@/lib/ambient";
 import { podcasts } from "@/data/podcasts";
-import { heroHighlights, institutionalServices, lives, nextLive, socialMedia, stories, videoCuts } from "@/data/media";
+import {
+  institutionalServices,
+  schedule,
+  socialMedia,
+  stories,
+  upcomingLive,
+  watchFeed,
+  watchRecommendations,
+  type ScheduleEntry,
+  type WatchFeedItem,
+} from "@/data/media";
 
 const institutionalImage = "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800&q=80";
 const AUTO_ROTATE_MS = 7000;
-const SLIDESHOW_MS = 3000;
+const TRANSITION_MS = 3000;
+const AD_STEP_MS = 1000;
 
-function RadioHero() {
+/** Alvo da assinatura premium (reapresentações de lives e podcasts na íntegra). */
+export interface PremiumTarget {
+  kind: string;
+  title: string;
+  host?: string;
+  when?: string;
+}
+
+type WatchPlaying = { item: WatchFeedItem; phase: "playing" };
+type WatchTransition = { item: WatchFeedItem; phase: "transition"; next: WatchFeedItem };
+type WatchState = WatchPlaying | WatchTransition;
+
+/* -------------------------------------------------------------------------- */
+/* Player imersivo do banner gigante                                         */
+/* -------------------------------------------------------------------------- */
+
+interface WatchOverlayProps {
+  watch: WatchState;
+  adIndex: number;
+  ambient: AmbientPalette;
+  uiVisible: boolean;
+  onToggleUi: () => void;
+  onClose: () => void;
+  onEnded: () => void;
+  onPremiumRequest: (target: PremiumTarget) => void;
+}
+
+function WatchOverlay({
+  watch,
+  adIndex,
+  ambient,
+  uiVisible,
+  onToggleUi,
+  onClose,
+  onEnded,
+  onPremiumRequest,
+}: WatchOverlayProps) {
+  const { item, phase } = watch;
+  const transitioning = phase === "transition";
+  const next = phase === "transition" ? watch.next : null;
+  const vertical = item.orientation === "vertical";
+
+  const mediaBox = vertical ? (
+    <div className="relative aspect-[9/16] h-full max-h-[62vh] w-auto overflow-hidden rounded-lg bg-black shadow-2xl">
+      <video
+        key={item.id}
+        data-testid="watch-media"
+        src={item.videoUrl}
+        autoPlay
+        controls
+        playsInline
+        onEnded={onEnded}
+        className="h-full w-full object-contain"
+      />
+    </div>
+  ) : (
+    <div className="aspect-video w-full max-w-5xl overflow-hidden rounded-lg bg-black shadow-2xl">
+      <video
+        key={item.id}
+        data-testid="watch-media"
+        src={item.videoUrl}
+        autoPlay
+        controls
+        playsInline
+        onEnded={onEnded}
+        className="h-full w-full object-contain"
+      />
+    </div>
+  );
+
+  return (
+    <div
+      data-testid="watch-overlay"
+      className="fixed inset-0 z-[90] lg:absolute lg:inset-0 lg:z-30"
+      style={{ "--ambient-a": ambient.a, "--ambient-b": ambient.b } as CSSProperties}
+    >
+      {!transitioning && (
+        <>
+          <div className="ambient-blob left-[-10%] top-[-20%] h-[80%] w-[70%]" style={{ background: ambient.a }} />
+          <div className="ambient-blob ambient-blob-2 bottom-[-20%] right-[-10%] h-[80%] w-[70%]" style={{ background: ambient.b }} />
+          <div className="ambient-dim" />
+          <div className="absolute left-0 right-0 top-0 z-10 flex items-center justify-between p-4">
+            <span className="inline-flex items-center gap-2 rounded-sm bg-background/85 px-2.5 py-1 text-[10px] font-bold uppercase text-foreground">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live" />
+              {item.kicker} • {vertical ? "Formato vertical" : "Tela ampla"}
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Fechar player"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div
+            className={cn(
+              "relative grid h-full lg:grid-cols-[1fr_20rem]",
+              uiVisible ? "flex-col" : "flex",
+            )}
+            onPointerDown={() => {
+              if (vertical) {
+                onToggleUi();
+              }
+            }}
+          >
+            <div className="flex min-h-0 flex-1 items-center justify-center p-3 lg:p-6">
+              {mediaBox}
+            </div>
+            <aside
+              className={cn(
+                "flex-col justify-between gap-4 overflow-y-auto p-5 lg:flex",
+                uiVisible ? "flex" : "hidden",
+              )}
+            >
+              <div>
+                <p className="editorial-kicker">{item.kicker}</p>
+                <h3 className="mt-2 font-serif text-xl font-bold text-foreground lg:text-2xl">{item.title}</h3>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  {item.kind === "live"
+                    ? "Transmissão ao vivo da programação Web Rádio Vitória."
+                    : item.kind === "video"
+                      ? "Matéria e cortes produzidos pela redação da Web Rádio Vitória."
+                      : "Conteúdo rápido em formato vertical, direto da redação."}
+                </p>
+                <div className="mt-5 rounded-md border border-border bg-card p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-brand">Legenda do áudio</p>
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{item.caption}</p>
+                </div>
+              </div>
+              {next && (
+                <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
+                  <img src={next.image} alt="" className="h-14 w-14 flex-shrink-0 rounded object-cover" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase text-brand">A seguir</p>
+                    <p className="truncate text-xs font-bold text-foreground">{next.title}</p>
+                  </div>
+                </div>
+              )}
+            </aside>
+          </div>
+          <div
+            className={cn(
+              "absolute bottom-4 left-4 right-4 z-10 flex items-center justify-between gap-3 sm:hidden",
+              uiVisible ? "flex" : "hidden",
+            )}
+          >
+            <span className="min-w-0 truncate text-xs font-bold text-overlay-foreground">{item.title}</span>
+            <span className="flex-shrink-0 text-[10px] uppercase text-overlay-muted">{item.kicker}</span>
+          </div>
+        </>
+      )}
+
+      {transitioning && (
+        <div data-testid="watch-transition" className="relative h-full overflow-y-auto bg-background">
+          <div className="container mx-auto flex min-h-full flex-col items-center justify-center gap-5 px-5 py-10">
+            <div className="mb-2 flex w-full max-w-md items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-brand">Conteúdo em destaque</span>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Fechar player"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {adIndex === 0 && next && (
+              <div data-testid="watch-next-card" className="w-full max-w-md overflow-hidden rounded-lg border border-border bg-card">
+                <div className="relative aspect-video overflow-hidden bg-black">
+                  <img src={next.image} alt="" className="h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-media-overlay" />
+                  <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-sm bg-live px-2.5 py-1 text-[10px] font-bold uppercase text-live-foreground">
+                    <Play className="h-3 w-3 fill-current" /> A seguir
+                  </span>
+                </div>
+                <div className="p-4">
+                  <p className="editorial-kicker">{next.kicker}</p>
+                  <h3 className="mt-1 font-serif text-lg font-bold text-foreground">{next.headline}</h3>
+                  <p className="mt-2 text-xs text-muted-foreground">Reproduzindo automaticamente em instantes…</p>
+                </div>
+              </div>
+            )}
+
+            {adIndex === 1 && (
+              <div data-testid="watch-premium-ad" className="w-full max-w-md rounded-lg border border-brand/40 bg-card p-6 text-center">
+                <Crown className="mx-auto mb-3 h-8 w-8 text-brand" />
+                <p className="editorial-kicker">Área premium</p>
+                <h3 className="mt-2 font-serif text-xl font-bold text-foreground">Assine e não perca nada</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  Reapresentações de lives e podcasts na íntegra são exclusivos para assinantes.
+                </p>
+                <Button className="mt-5 w-full" onClick={() => onPremiumRequest({ kind: "premium", title: "Área Premium da Web Rádio Vitória" })}>
+                  <Crown className="h-4 w-4" /> Assinar a área premium
+                </Button>
+              </div>
+            )}
+
+            {adIndex === 2 && (
+              <div data-testid="watch-schedule-ad" className="w-full max-w-md space-y-3">
+                <div className="rounded-lg border border-border bg-card p-5">
+                  <p className="editorial-kicker">Grade de programação</p>
+                  <h3 className="mt-2 font-serif text-lg font-bold text-foreground">Próxima live</h3>
+                  {upcomingLive && (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {upcomingLive.title} — {upcomingLive.day} às {upcomingLive.time} com {upcomingLive.host}
+                    </p>
+                  )}
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Próximo programa: {firstFreeProgram().title} com {firstFreeProgram().host}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-5">
+                  <p className="editorial-kicker">Na área premium</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    Reapresentações de lives e episódios completos de podcasts — assine para assistir na íntegra.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-1.5" aria-hidden>
+              {[0, 1, 2].map((index) => (
+                <span key={index} className={cn("h-1.5 w-5 rounded-full", index === adIndex ? "bg-brand" : "bg-border")} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function firstFreeProgram(): ScheduleEntry {
+  return schedule.find((entry) => entry.kind === "program" && !entry.premium) ?? schedule[0];
+}
+
+/* -------------------------------------------------------------------------- */
+/* Hero do banner gigante                                                    */
+/* -------------------------------------------------------------------------- */
+
+function RadioHero({
+  watch,
+  onPlay,
+  onCloseWatch,
+  onEnded,
+  onAutoPlay,
+  onPremiumRequest,
+}: {
+  watch: WatchState | null;
+  onPlay: (item: WatchFeedItem) => void;
+  onCloseWatch: () => void;
+  onEnded: () => void;
+  onAutoPlay: () => void;
+  onPremiumRequest: (target: PremiumTarget) => void;
+}) {
   const player = useRadioPlayerContext();
   const hasStream = Boolean(player.streamUrl);
 
   const [activeIndex, setActiveIndex] = useState(0);
-  const [watchMode, setWatchMode] = useState(false);
-  const [slideIndex, setSlideIndex] = useState(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const [ambient, setAmbient] = useState<AmbientPalette>({ a: "#7c2d12", b: "#1c1917" });
+  const [uiVisible, setUiVisible] = useState(true);
+  const [adIndex, setAdIndex] = useState(0);
 
-  const active = heroHighlights[activeIndex];
-  const images = active.images && active.images.length > 0 ? active.images : [active.image];
+  const active = watchFeed[activeIndex % watchFeed.length];
 
-  // Rotação automática dos destaques — pausada enquanto um vídeo/live/reel/
-  // story está rodando dentro do banner.
+  // Rotação automática dos destaques — suspensa enquanto o banner é usado.
   useEffect(() => {
-    if (watchMode) {
+    if (watch) {
       return;
     }
     const timer = window.setInterval(() => {
-      setActiveIndex((index) => (index + 1) % heroHighlights.length);
+      setActiveIndex((index) => (index + 1) % watchFeed.length);
     }, AUTO_ROTATE_MS);
     return () => window.clearInterval(timer);
-  }, [watchMode]);
+  }, [watch]);
 
-  // Slideshow das imagens dos destaques sem vídeo real.
+  // Cores ambiente capturadas da capa/vídeo em exibição (só enquanto toca).
+  const watchImage = watch?.phase === "playing" ? watch.item.image : null;
   useEffect(() => {
-    if (!watchMode || active.videoUrl) {
+    if (!watchImage) {
       return;
     }
-    const timer = window.setInterval(() => {
-      setSlideIndex((index) => (index + 1) % images.length);
-    }, SLIDESHOW_MS);
-    return () => window.clearInterval(timer);
-  }, [watchMode, active.videoUrl, images.length]);
+    let cancelled = false;
+    void extractPalette(watchImage).then((palette) => {
+      if (!cancelled) {
+        setAmbient(palette);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [watchImage]);
 
-  const handleWatch = () => {
-    setSlideIndex(0);
-    setWatchMode(true);
-  };
+  // Auto-ocultar a UI (mobile) depois de iniciar a reprodução, como no YouTube.
+  // A chave `mediaId` muda a cada novo item reproduzido (e some na transição),
+  // então o efeito reseta o temporizador sem depender do objeto `watch` inteiro.
+  const mediaId = watch?.phase === "playing" ? watch.item.id : null;
+  useEffect(() => {
+    if (!mediaId) {
+      return;
+    }
+    setUiVisible(true);
+    const timer = window.setTimeout(() => setUiVisible(false), 2800);
+    return () => window.clearTimeout(timer);
+  }, [mediaId]);
 
-  const handleMediaEnded = () => {
-    setWatchMode(false);
-    setSlideIndex(0);
-  };
+  // Fase de transição: alterna manchete/próximo, anúncio premium e grade, e
+  // dispara o play automático do próximo em 3 segundos.
+  const transitionNextId = watch?.phase === "transition" ? watch.next.id : null;
+  useEffect(() => {
+    if (!transitionNextId) {
+      return;
+    }
+    setAdIndex(0);
+    const step = window.setInterval(() => setAdIndex((index) => (index + 1) % 3), AD_STEP_MS);
+    const timer = window.setTimeout(onAutoPlay, TRANSITION_MS);
+    return () => {
+      window.clearInterval(step);
+      window.clearTimeout(timer);
+    };
+  }, [transitionNextId, onAutoPlay]);
 
   return (
-    <section className="relative min-h-[640px] overflow-hidden border-b border-border md:min-h-[700px]" aria-label="Rádio ao vivo">
-      <div className="absolute inset-0">
-        <img src={active.image} alt="" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-hero-overlay" />
-      </div>
-      <div className="container relative flex min-h-[640px] flex-col justify-end py-12 md:min-h-[700px] md:py-16">
-        <div className="grid items-end gap-10 lg:grid-cols-[1fr_26rem]">
-          <div className="max-w-2xl">
-            <div className="mb-5 flex flex-wrap items-center gap-3">
-              {hasStream ? (
-                <span className="inline-flex items-center gap-2 rounded-sm bg-live px-3 py-1.5 text-[10px] font-bold uppercase text-live-foreground">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" />
-                  Ao vivo
-                </span>
-              ) : (
-                <>
-                  <span className="inline-flex items-center gap-2 rounded-sm bg-live px-3 py-1.5 text-[10px] font-bold uppercase text-live-foreground">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" />
-                    Em breve live
-                  </span>
-                  <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
-                    {nextLive.when}
-                  </span>
-                </>
-              )}
-              <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
-                De Tupã para todo o Brasil
-              </span>
-            </div>
-            <h1 className="font-serif text-4xl font-bold leading-tight text-overlay-foreground md:text-6xl">
-              Web Rádio Vitória
-            </h1>
-            <p className="mt-4 max-w-2xl text-base leading-relaxed text-overlay-muted md:text-lg">
-              24 horas de programação ao vivo com música, informação e fé — e uma
-              biblioteca de podcasts, reels, stories e vídeos para ouvir e assistir
-              quando quiser.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              {hasStream && (
-                <button type="button" onClick={player.openPlayer} className="btn-brand px-10 py-4 text-sm font-bold shadow-xl transition-all duration-200 hover:shadow-2xl">
-                  <Play className="h-5 w-5 fill-current" /> Ouvir Agora
-                </button>
-              )}
-              <Button asChild variant="outline" size="lg">
-                <Link to="/noticias">
-                  <Newspaper className="h-5 w-5" /> Acessar Vitória News
-                </Link>
-              </Button>
-            </div>
+    <section
+      className="relative min-h-[640px] overflow-hidden border-b border-border md:min-h-[700px]"
+      aria-label="Rádio ao vivo"
+    >
+      {!watch && (
+        <>
+          <div className="absolute inset-0">
+            <img src={active.image} alt="" className="h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-hero-overlay" />
           </div>
-
-          {/* Destaques do banner: carrossel automático + reprodutor inline */}
-          <div className="overflow-hidden rounded-lg border border-border bg-card/90 shadow-2xl backdrop-blur-md" aria-label={`Destaque: ${active.title}`}>
-            <div className="relative aspect-video overflow-hidden bg-black">
-              {watchMode && active.videoUrl ? (
-                <>
-                  <video
-                    key={active.id}
-                    ref={videoRef}
-                    src={active.videoUrl}
-                    autoPlay
-                    controls
-                    playsInline
-                    onEnded={handleMediaEnded}
-                    className="h-full w-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setWatchMode(false)}
-                    aria-label="Fechar reprodutor do banner"
-                    className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </>
-              ) : watchMode ? (
-                <>
-                  <img key={images[slideIndex]} src={images[slideIndex]} alt="" className="h-full w-full object-cover" />
-                  <div className="absolute inset-0 bg-media-overlay" />
-                  <audio ref={audioRef} src={active.audioUrl} autoPlay onEnded={handleMediaEnded} className="hidden" />
-                  <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-sm bg-background/85 px-2 py-1 text-[10px] font-bold uppercase text-foreground">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live" />
-                    Tocando agora
+          <div className="container relative flex min-h-[640px] flex-col justify-end py-12 md:min-h-[700px] md:py-16">
+            <div className="grid items-end gap-10 lg:grid-cols-[1fr_26rem]">
+              <div className="max-w-2xl">
+                <div className="mb-5 flex flex-wrap items-center gap-3">
+                  {hasStream ? (
+                    <span className="inline-flex items-center gap-2 rounded-sm bg-live px-3 py-1.5 text-[10px] font-bold uppercase text-live-foreground">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" />
+                      Ao vivo
+                    </span>
+                  ) : upcomingLive ? (
+                    <>
+                      <span className="inline-flex items-center gap-2 rounded-sm bg-live px-3 py-1.5 text-[10px] font-bold uppercase text-live-foreground">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" />
+                        Em breve live
+                      </span>
+                      <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
+                        {upcomingLive.day} • {upcomingLive.time}
+                      </span>
+                    </>
+                  ) : null}
+                  <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
+                    De Tupã para todo o Brasil
                   </span>
-                  {watchMode && (
-                    <button
-                      type="button"
-                      onClick={() => setWatchMode(false)}
-                      aria-label="Fechar reprodutor do banner"
-                      className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
-                    >
-                      <X className="h-4 w-4" />
+                </div>
+                <h1 className="font-serif text-4xl font-bold leading-tight text-overlay-foreground md:text-6xl">
+                  Web Rádio Vitória
+                </h1>
+                <p className="mt-4 max-w-2xl text-base leading-relaxed text-overlay-muted md:text-lg">
+                  24 horas de programação ao vivo com música, informação e fé — e uma
+                  biblioteca de vídeos, lives, reels e stories para assistir quando quiser.
+                </p>
+                <div className="mt-8 flex flex-wrap items-center gap-3">
+                  {hasStream && (
+                    <button type="button" onClick={player.openPlayer} className="btn-brand px-10 py-4 text-sm font-bold shadow-xl transition-all duration-200 hover:shadow-2xl">
+                      <Play className="h-5 w-5 fill-current" /> Ouvir Agora
                     </button>
                   )}
-                </>
-              ) : (
-                <button type="button" onClick={handleWatch} className="group relative block h-full w-full text-left">
-                  <img src={active.image} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  <div className="absolute inset-0 bg-media-overlay" />
-                  <span className="absolute left-3 top-3 rounded-sm bg-background/85 px-2 py-1 text-[10px] font-bold uppercase text-foreground">
-                    {active.kicker}
-                  </span>
-                  <span className="absolute inset-x-0 bottom-0 flex items-center gap-2 p-4">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-transform duration-200 group-hover:scale-110">
-                      <Play className="h-5 w-5 translate-x-0.5 fill-current" />
-                    </span>
-                    <span className="font-serif text-lg font-bold text-overlay-foreground">{active.title}</span>
-                  </span>
-                </button>
-              )}
-            </div>
-            <div className="flex items-center justify-between gap-3 p-4">
-              <div className="min-w-0">
-                <p className="editorial-kicker">{active.kicker}</p>
-                <p className="mt-0.5 truncate font-serif text-sm font-bold text-foreground">{active.title}</p>
+                  <Button asChild variant="outline" size="lg">
+                    <Link to="/noticias">
+                      <Newspaper className="h-5 w-5" /> Acessar Vitória News
+                    </Link>
+                  </Button>
+                </div>
               </div>
-              {!watchMode && (
-                <button type="button" onClick={handleWatch} className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-xs font-bold text-brand-foreground transition-colors hover:bg-accent">
-                  <Play className="h-3.5 w-3.5 fill-current" /> Assistir
-                </button>
-              )}
-              <span className="flex-shrink-0 text-xs tabular-nums text-muted-foreground">
-                {activeIndex + 1}/{heroHighlights.length}
-              </span>
+
+              {/* Destaques do banner: carrossel automático */}
+              <div className="overflow-hidden rounded-lg border border-border bg-card/90 shadow-2xl backdrop-blur-md" aria-label={`Destaque: ${active.title}`}>
+                <div className="relative aspect-video overflow-hidden bg-black">
+                  <button type="button" onClick={() => onPlay(active)} className="group relative block h-full w-full text-left">
+                    <img src={active.image} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-media-overlay" />
+                    <span className="absolute left-3 top-3 rounded-sm bg-background/85 px-2 py-1 text-[10px] font-bold uppercase text-foreground">
+                      {active.kicker}
+                    </span>
+                    <span className="absolute inset-x-0 bottom-0 flex items-center gap-2 p-4">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-transform duration-200 group-hover:scale-110">
+                        <Play className="h-5 w-5 translate-x-0.5 fill-current" />
+                      </span>
+                      <span className="font-serif text-lg font-bold text-overlay-foreground">{active.title}</span>
+                    </span>
+                  </button>
+                </div>
+                <div className="flex items-center justify-between gap-3 p-4">
+                  <div className="min-w-0">
+                    <p className="editorial-kicker">{active.kicker}</p>
+                    <p className="mt-0.5 truncate font-serif text-sm font-bold text-foreground">{active.title}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onPlay(active)}
+                    className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-xs font-bold text-brand-foreground transition-colors hover:bg-accent"
+                  >
+                    <Play className="h-3.5 w-3.5 fill-current" /> Assistir
+                  </button>
+                  <span className="flex-shrink-0 text-xs tabular-nums text-muted-foreground">
+                    {activeIndex + 1}/{watchFeed.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-1.5 lg:hidden" aria-hidden>
+              {watchFeed.map((item, index) => (
+                <span key={item.id} className={cn("h-1.5 w-6 rounded-full", index === activeIndex ? "bg-brand" : "bg-foreground/20")} />
+              ))}
             </div>
           </div>
-        </div>
-        <div className="mt-6 flex justify-end gap-1.5 lg:hidden" aria-hidden>
-          {heroHighlights.map((item, index) => (
-            <span key={item.id} className={`h-1.5 w-6 rounded-full ${index === activeIndex ? "bg-brand" : "bg-foreground/20"}`} />
-          ))}
-        </div>
-      </div>
+        </>
+      )}
+
+      {watch && (
+        <WatchOverlay
+          watch={watch}
+          adIndex={adIndex}
+          ambient={ambient}
+          uiVisible={uiVisible}
+          onToggleUi={() => setUiVisible((visible) => !visible)}
+          onClose={onCloseWatch}
+          onEnded={onEnded}
+          onPremiumRequest={onPremiumRequest}
+        />
+      )}
     </section>
   );
 }
 
-function PodcastCard({ title, category, durationLabel, imageUrl, onPlay, isCurrent }: {
+/* -------------------------------------------------------------------------- */
+/* Programação dinâmica (Web Rádio Programação)                              */
+/* -------------------------------------------------------------------------- */
+
+function PodcastCard({ title, category, durationLabel, imageUrl, host, when, isCurrent, premium, onOpen }: {
   title: string;
   category: string;
   durationLabel: string;
   imageUrl: string;
-  onPlay: () => void;
+  host: string;
+  when: string;
   isCurrent: boolean;
+  premium: boolean;
+  onOpen: () => void;
 }) {
   return (
     <article className="group flex gap-4 overflow-hidden rounded-md border border-border bg-card p-4 transition-colors hover:border-brand/50">
@@ -210,67 +501,136 @@ function PodcastCard({ title, category, durationLabel, imageUrl, onPlay, isCurre
       <div className="min-w-0 flex-1">
         <span className="text-[10px] font-bold uppercase text-brand">{category}</span>
         <h3 className="mt-1 font-serif text-sm font-bold leading-snug text-foreground">{title}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">{durationLabel}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {durationLabel} • Apresentador(a): {host} • {when}
+        </p>
         <button
           type="button"
-          onClick={onPlay}
-          aria-label={`Reproduzir podcast ${title}`}
+          onClick={onOpen}
+          aria-label={premium ? `Assinar para ouvir ${title}` : `Reproduzir podcast ${title}`}
           aria-pressed={isCurrent}
           className={`mt-3 inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
-            isCurrent ? "bg-brand text-brand-foreground" : "bg-secondary text-secondary-foreground hover:bg-brand hover:text-brand-foreground"
+            premium
+              ? "bg-secondary text-secondary-foreground hover:bg-brand hover:text-brand-foreground"
+              : isCurrent
+                ? "bg-brand text-brand-foreground"
+                : "bg-secondary text-secondary-foreground hover:bg-brand hover:text-brand-foreground"
           }`}
         >
-          {isCurrent ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
-          {isCurrent ? "Tocando" : "Ouvir"}
+          {premium ? <Lock className="h-3.5 w-3.5" /> : isCurrent ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+          {premium ? "Premium" : isCurrent ? "Tocando" : "Ouvir"}
         </button>
       </div>
     </article>
   );
 }
 
-function ProgramSchedule() {
+function ProgrammingSection({
+  onPlay,
+  onPremium,
+}: {
+  onPlay: (item: WatchFeedItem) => void;
+  onPremium: (target: PremiumTarget) => void;
+}) {
   const player = useRadioPlayerContext();
-  const items = [
-    { time: "Agora", name: "Web Rádio Vitória", detail: "24 hs adorando a Deus" },
-    { time: "Conteúdo", name: "Podcasts e boletins", detail: "Episódios sob demanda, é só dar o play" },
-    { time: "Participação", name: "Fale com a rádio", detail: "Envie sua sugestão de pauta" },
-  ];
+  const [open, setOpen] = useState(true);
+
+  const handleRow = (entry: ScheduleEntry) => {
+    if (entry.premium) {
+      onPremium({ kind: entry.kind, title: entry.title, host: entry.host, when: `${entry.day} • ${entry.time}` });
+      return;
+    }
+    if (entry.kind === "live") {
+      const liveItem = watchFeed.find((item) => item.id === "live-now-1");
+      if (liveItem) {
+        onPlay(liveItem);
+      }
+      return;
+    }
+    if (entry.kind === "podcast") {
+      const podcast = podcasts.find((item) => !item.premium);
+      if (podcast) {
+        player.playPodcast(podcast);
+      }
+    }
+    // Programas abertos (não-premium) são informativos nesta tela.
+  };
+
+  const handlePodcast = (podcast: (typeof podcasts)[number]) => {
+    if (podcast.premium) {
+      onPremium({ kind: "podcast", title: podcast.title, host: podcast.host, when: podcast.when });
+      return;
+    }
+    player.playPodcast(podcast);
+  };
 
   return (
     <section className="page-band">
-      <div className="container grid gap-10 lg:grid-cols-[17rem_1fr]">
-        <aside className="space-y-10">
+      <div className="container space-y-10">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          className="flex w-full items-center justify-between gap-4 border-b border-border pb-4 text-left"
+        >
           <div>
             <p className="editorial-kicker">Web Rádio</p>
-            <h2 className="mt-2 font-serif text-2xl font-bold">Programação</h2>
-            <div className="mt-5 space-y-3">
-              {items.map((item, index) => (
-                <div key={item.time} className={`border-l-2 p-4 ${index === 0 ? "border-brand bg-card" : "border-border"}`}>
-                  <span className="text-[10px] font-bold uppercase text-brand">{item.time}</span>
-                  <h3 className="mt-1 text-sm font-bold text-foreground">{item.name}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="editorial-kicker text-primary">Sobre a rádio</p>
-            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              A Web Rádio Vitória transmite 24 horas por dia, unindo notícias,
-              informação e fé para toda a comunidade de Tupã e região.
+            <h2 className="mt-2 font-serif text-3xl font-bold">Programação</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Horários de programas, lives e podcasts. Itens marcados como premium mostram apenas data, hora, nome e apresentador.
             </p>
-            <Link to="/#institucional" className="link-arrow mt-5">
-              Conhecer a área institucional <ArrowRight />
-            </Link>
           </div>
-        </aside>
+          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+            {open ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </span>
+        </button>
+
+        {open && (
+          <div className="grid gap-3" data-testid="schedule-grid">
+            {schedule.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                onClick={() => handleRow(entry)}
+                className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-4 gap-y-1 rounded-md border border-border bg-card p-4 text-left transition-colors hover:border-brand/50"
+              >
+                <span className="row-span-2 w-24 text-[10px] font-bold uppercase leading-tight text-muted-foreground">{entry.day}</span>
+                <span className="rounded bg-secondary px-2 py-1 text-xs font-bold tabular-nums text-secondary-foreground">{entry.time}</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold text-foreground">{entry.title}</span>
+                  <span className="block text-xs text-muted-foreground">Apresentador(a): {entry.host}</span>
+                </span>
+                {entry.premium ? (
+                  <span className="inline-flex items-center gap-1 rounded-sm bg-secondary px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground">
+                    <Lock className="h-3 w-3" /> Premium
+                  </span>
+                ) : entry.kind === "live" ? (
+                  <span className="inline-flex items-center gap-1 rounded-sm bg-live px-2 py-1 text-[10px] font-bold uppercase text-live-foreground">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" /> Ao vivo
+                  </span>
+                ) : entry.kind === "podcast" ? (
+                  <span className="inline-flex items-center gap-1 rounded-sm bg-secondary px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground">
+                    <Play className="h-3 w-3" /> Podcast
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-sm bg-secondary px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground">
+                    <Info className="h-3 w-3" /> Programa
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div>
           <div className="mb-6 flex items-end justify-between border-b border-border pb-4">
             <div>
               <p className="editorial-kicker">Sob demanda</p>
               <h2 className="mt-2 font-serif text-3xl font-bold">Podcasts</h2>
             </div>
-            <span className="text-xs text-muted-foreground">{podcasts.length} episódios disponíveis</span>
+            <span className="text-xs text-muted-foreground">
+              {podcasts.filter((item) => !item.premium).length} prévias gratuitas • episódios completos premium
+            </span>
           </div>
           <div className="grid gap-6 sm:grid-cols-2">
             {podcasts.map((podcast) => (
@@ -280,8 +640,11 @@ function ProgramSchedule() {
                 category={podcast.category}
                 durationLabel={podcast.durationLabel}
                 imageUrl={podcast.imageUrl}
-                onPlay={() => player.playPodcast(podcast)}
+                host={podcast.host}
+                when={podcast.when}
+                onOpen={() => handlePodcast(podcast)}
                 isCurrent={player.nowPlaying?.id === podcast.id && player.nowPlaying?.kind === "podcast"}
+                premium={podcast.premium}
               />
             ))}
           </div>
@@ -291,8 +654,12 @@ function ProgramSchedule() {
   );
 }
 
-/** Reels e stories juntos, em duas faixas horizontais lado a lado. */
-function EntertainmentBand() {
+/* -------------------------------------------------------------------------- */
+/* Entretenimento (reels | stories)                                          */
+/* -------------------------------------------------------------------------- */
+
+function EntertainmentBand({ onSelectId }: { onSelectId: (id: string) => void }) {
+  const selectWatch = (id: string) => onSelectId(id);
   return (
     <section className="page-band border-y border-border bg-card">
       <div className="container space-y-12">
@@ -302,42 +669,22 @@ function EntertainmentBand() {
             <h2 className="mt-2 font-serif text-3xl font-bold">Reels e stories</h2>
           </div>
           <span className="hidden text-xs text-muted-foreground md:inline">
-            Conteúdo rápido e descontraído da redação
+            Clique para assistir no banner
           </span>
         </div>
         <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <MediaRail title="Reels da redação" eyebrow="Reels" items={socialMedia} portrait />
-          <MediaRail title="Stories em destaque" eyebrow="Stories" items={stories} portrait />
+          <MediaRail title="Reels da redação" eyebrow="Reels" items={socialMedia} portrait onSelect={(item) => selectWatch(item.id)} />
+          <MediaRail title="Stories em destaque" eyebrow="Stories" items={stories} portrait onSelect={(item) => selectWatch(item.id)} />
         </div>
       </div>
     </section>
   );
 }
 
-/** Vídeos e lives lado a lado, cada um com sua rolagem horizontal. */
-function VideosBand() {
-  return (
-    <section className="page-band">
-      <div className="container space-y-12">
-        <div className="flex items-end justify-between border-b border-border pb-4">
-          <div>
-            <p className="editorial-kicker">Assista</p>
-            <h2 className="mt-2 font-serif text-3xl font-bold">Vídeos e lives</h2>
-          </div>
-          <span className="hidden text-xs text-muted-foreground md:inline">
-            Cortes, programas e reapresentações de lives
-          </span>
-        </div>
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <MediaRail title="Vídeos" eyebrow="Cortes" items={videoCuts} />
-          <MediaRail title="Lives" eyebrow="Reapresentações" items={lives} />
-        </div>
-      </div>
-    </section>
-  );
-}
+/* -------------------------------------------------------------------------- */
+/* Institucional (somente via menu)                                          */
+/* -------------------------------------------------------------------------- */
 
-/** Área institucional — só é exibida ao clicar no menu Institucional. */
 function InstitutionalBand() {
   const location = useLocation();
   if (location.hash !== "#institucional") {
@@ -389,14 +736,120 @@ function InstitutionalBand() {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* Painel da área premium                                                    */
+/* -------------------------------------------------------------------------- */
+
+function PremiumPanel({ target, onClose }: { target: PremiumTarget; onClose: () => void }) {
+  return (
+    <div
+      data-testid="premium-panel"
+      role="dialog"
+      aria-label="Área premium"
+      className="fixed inset-0 z-[95] flex items-center justify-center p-4"
+    >
+      <button type="button" aria-label="Fechar painel premium" onClick={onClose} className="absolute inset-0 bg-black/70" />
+      <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-brand/40 bg-card p-6 shadow-2xl md:p-8">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar"
+          className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <Crown className="mb-3 h-9 w-9 text-brand" />
+        <p className="editorial-kicker">Área premium</p>
+        <h2 className="mt-2 font-serif text-2xl font-bold text-foreground">{target.title}</h2>
+        {target.host && (
+          <p className="mt-3 text-sm text-muted-foreground">Apresentador(a): {target.host}</p>
+        )}
+        {target.when && (
+          <p className="mt-1 text-sm text-muted-foreground">Data e horário: {target.when}</p>
+        )}
+        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+          Reapresentações de lives e podcasts na íntegra são exclusivos para assinantes da área premium.
+          Assine para assistir e ouvir sem limites.
+        </p>
+        <div className="mt-5 space-y-2 rounded-md border border-border bg-background p-4">
+          <p className="flex items-center gap-2 text-xs font-bold text-foreground"><Play className="h-3.5 w-3.5 text-brand" /> Reapresentações de lives</p>
+          <p className="flex items-center gap-2 text-xs font-bold text-foreground"><Play className="h-3.5 w-3.5 text-brand" /> Podcasts na íntegra</p>
+          <p className="flex items-center gap-2 text-xs font-bold text-foreground"><Radio className="h-3.5 w-3.5 text-brand" /> Conteúdos especiais da programação</p>
+        </div>
+        <Button className="mt-5 w-full" onClick={onClose}>
+          <Crown className="h-4 w-4" /> Assinar a área premium
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Home                                                                       */
+/* -------------------------------------------------------------------------- */
+
 export default function Home() {
+  const [watch, setWatch] = useState<WatchState | null>(null);
+  const [premium, setPremium] = useState<PremiumTarget | null>(null);
+
+  const playNow = useCallback((item: WatchFeedItem) => {
+    setPremium(null);
+    setWatch({ item, phase: "playing" });
+  }, []);
+
+  const closeWatch = useCallback(() => setWatch(null), []);
+
+  const handleEnded = useCallback(() => {
+    setWatch((prev) => {
+      if (!prev || prev.phase !== "playing") {
+        return prev;
+      }
+      const index = watchRecommendations.findIndex((item) => item.id === prev.item.id);
+      const next = watchRecommendations[(index + 1) % watchRecommendations.length];
+      return { item: prev.item, phase: "transition", next };
+    });
+  }, []);
+
+  const autoPlayNext = useCallback(() => {
+    setWatch((prev) => {
+      if (!prev || prev.phase !== "transition") {
+        return prev;
+      }
+      return { item: prev.next, phase: "playing" };
+    });
+  }, []);
+
+  const selectWatchById = useCallback(
+    (id: string) => {
+      const item = watchFeed.find((entry) => entry.id === id);
+      if (item) {
+        playNow(item);
+      }
+    },
+    [playNow],
+  );
+
+  const openPremium = useCallback(
+    (target: PremiumTarget) => {
+      setPremium(target);
+    },
+    [],
+  );
+
   return (
     <Layout>
-      <RadioHero />
-      <ProgramSchedule />
-      <EntertainmentBand />
-      <VideosBand />
+      <RadioHero
+        watch={watch}
+        onPlay={playNow}
+        onCloseWatch={closeWatch}
+        onEnded={handleEnded}
+        onAutoPlay={autoPlayNext}
+        onPremiumRequest={openPremium}
+      />
+      <ProgrammingSection onPlay={playNow} onPremium={openPremium} />
+      <EntertainmentBand onSelectId={selectWatchById} />
       <InstitutionalBand />
+      {premium && <PremiumPanel target={premium} onClose={() => setPremium(null)} />}
     </Layout>
   );
 }

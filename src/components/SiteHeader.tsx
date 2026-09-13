@@ -1,6 +1,7 @@
-import { Link, NavLink } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Menu, X, Radio, Play, Headphones, Newspaper } from "lucide-react";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
 
@@ -12,7 +13,21 @@ const navItems = [
 
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname, hash } = useLocation();
   const player = useRadioPlayerContext();
+
+  // Item ativo por rota real: "Início" só sem hash; "Institucional" só com o
+  // hash #institucional; a borda inferior vermelha aparece apenas no item
+  // clicado/ativo — os demais ficam sem borda (transparente).
+  const isNavActive = (path: string) => {
+    if (path === "/#institucional") {
+      return hash === "#institucional";
+    }
+    if (path === "/") {
+      return pathname === "/" && !hash;
+    }
+    return pathname === path;
+  };
 
   // O cabeçalho só oferece "Ouvir Agora" quando a transmissão está disponível
   // e nada está em reprodução — os controles de pause/retomada ficam nas
@@ -54,26 +69,30 @@ export function SiteHeader() {
       <nav className="border-t border-border" aria-label="Navegação principal">
         <div className="container">
           <ul className={`${menuOpen ? "flex" : "hidden"} flex-col lg:flex lg:flex-row lg:items-center`}>
-            {navItems.map((item) => (
-              <li key={item.path}>
-                <NavLink
-                  to={item.path}
-                  end={item.path === "/"}
-                  className={({ isActive }) =>
-                    `block border-l-2 px-4 py-3 text-xs font-bold uppercase transition-colors lg:border-b-2 lg:border-l-0 ${
-                      isActive ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`
-                  }
-                  onClick={() => setMenuOpen(false)}
-                >
-                  {item.label === "Vitória News" ? (
-                    <span className="inline-flex items-center gap-1.5"><Newspaper className="h-3.5 w-3.5" />{item.label}</span>
-                  ) : (
-                    item.label
-                  )}
-                </NavLink>
-              </li>
-            ))}
+            {navItems.map((item) => {
+              const isActive = isNavActive(item.path);
+              return (
+                <li key={item.path}>
+                  <Link
+                    to={item.path}
+                    aria-current={isActive ? "page" : undefined}
+                    className={cn(
+                      "block border-l-2 px-4 py-3 text-xs font-bold uppercase transition-colors lg:border-b-2 lg:border-l-0",
+                      isActive
+                        ? "border-primary text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    {item.label === "Vitória News" ? (
+                      <span className="inline-flex items-center gap-1.5"><Newspaper className="h-3.5 w-3.5" />{item.label}</span>
+                    ) : (
+                      item.label
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
             <li className="lg:hidden">
               <Link
                 to="/contato"

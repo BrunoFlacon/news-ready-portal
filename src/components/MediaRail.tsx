@@ -9,9 +9,10 @@ interface MediaRailProps {
   eyebrow: string;
   items: MediaItem[];
   portrait?: boolean;
+  onSelect?: (item: MediaItem) => void;
 }
 
-export function MediaRail({ title, eyebrow, items, portrait = false }: MediaRailProps) {
+export function MediaRail({ title, eyebrow, items, portrait = false, onSelect }: MediaRailProps) {
   const railRef = useRef<HTMLDivElement>(null);
   const scroll = (direction: number) => railRef.current?.scrollBy({ left: direction * 360, behavior: "smooth" });
 
@@ -28,21 +29,43 @@ export function MediaRail({ title, eyebrow, items, portrait = false }: MediaRail
         </div>
       </div>
       <div ref={railRef} className="scrollbar-hidden flex snap-x gap-4 overflow-x-auto pb-2">
-        {items.map((item) => (
-          <article key={item.id} className={`${portrait ? "w-[72vw] max-w-56" : "w-[82vw] max-w-sm"} group shrink-0 snap-start`}>
-            <div className={`${portrait ? "aspect-[9/14]" : "aspect-video"} relative overflow-hidden rounded-md border border-border bg-card`}>
-              <img src={item.image} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-              <div className="absolute inset-0 bg-media-overlay" />
-              <div className="absolute inset-x-0 bottom-0 p-4">
-                {item.category && <span className="mb-2 block text-[10px] font-bold uppercase text-brand">{item.category}</span>}
-                <h3 className="font-serif font-bold leading-snug text-overlay-foreground">{item.title}</h3>
+        {items.map((item) => {
+          const card = (
+            <>
+              <div className={`${portrait ? "aspect-[9/14]" : "aspect-video"} relative overflow-hidden rounded-md border border-border bg-card`}>
+                <img src={item.image} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                <div className="absolute inset-0 bg-media-overlay" />
+                <div className="absolute inset-x-0 bottom-0 p-4">
+                  {item.category && <span className="mb-2 block text-[10px] font-bold uppercase text-brand">{item.category}</span>}
+                  <h3 className="font-serif font-bold leading-snug text-overlay-foreground">{item.title}</h3>
+                </div>
+                <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-sm bg-background/85 px-2 py-1 text-[10px] font-bold text-foreground">
+                  <Play className="h-3 w-3 fill-current" /> {item.duration ?? "Story"}
+                </span>
               </div>
-              <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-sm bg-background/85 px-2 py-1 text-[10px] font-bold text-foreground">
-                <Play className="h-3 w-3 fill-current" /> {item.duration ?? "Story"}
-              </span>
-            </div>
-          </article>
-        ))}
+            </>
+          );
+
+          return (
+            <article
+              key={item.id}
+              className={`${portrait ? "w-[72vw] max-w-56" : "w-[82vw] max-w-sm"} group shrink-0 snap-start`}
+            >
+              {onSelect ? (
+                <button
+                  type="button"
+                  onClick={() => onSelect(item)}
+                  aria-label={`Assistir ${item.title}`}
+                  className="block w-full text-left"
+                >
+                  {card}
+                </button>
+              ) : (
+                card
+              )}
+            </article>
+          );
+        })}
       </div>
     </section>
   );

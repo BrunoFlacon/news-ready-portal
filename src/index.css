@@ -78,6 +78,23 @@
   .wave-bar { display: inline-block; transform-origin: bottom; animation: wave 1s ease-in-out infinite; }
   /* Slider de progresso (barra estilo Spotify) */
   .range-brand { accent-color: hsl(var(--brand)); }
+  /* Fundo ambiente do banner gigante: cores capturadas do vídeo com desfoque
+     suave animado para preencher telas grandes sem deixar áreas vazias. */
+  @keyframes ambient-drift {
+    0% { transform: translate3d(-6%, -4%, 0) scale(1) rotate(0deg); }
+    50% { transform: translate3d(6%, 4%, 0) scale(1.18) rotate(6deg); }
+    100% { transform: translate3d(-4%, 6%, 0) scale(1.05) rotate(-4deg); }
+  }
+  .ambient-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(70px);
+    opacity: .55;
+    animation: ambient-drift 16s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+  .ambient-blob-2 { animation-duration: 22s; animation-delay: -8s; opacity: .45; }
+  .ambient-dim { position: absolute; inset: 0; background: hsl(0 0% 2% / .55); }
 }
 
 @media (prefers-reduced-motion: reduce) {

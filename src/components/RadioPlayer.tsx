@@ -235,7 +235,10 @@ export function useRadioPlayer(): RadioPlayerApi {
   const playPodcast = useCallback((podcast: Podcast, list?: Podcast[]) => {
     liveAudioRef.current?.pause();
     videoRef.current?.pause();
-    const listItems = list && list.length > 0 ? list : podcasts;
+    // Na fila entram apenas episódios gratuitos (prévias); episódios na
+    // íntegra são exclusivos da área premium e não fazem parte da playlist.
+    const listItems =
+      list && list.length > 0 ? list : podcasts.filter((item) => !item.premium);
     const index = Math.max(0, listItems.findIndex((item) => item.id === podcast.id));
     setQueue(listItems);
     setQueueIndex(index);
@@ -802,7 +805,10 @@ export function SuggestionsPanel({ podcastTitle, onPlayPodcast, onPlayVisual, on
 
       <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-brand">Ouvir mais podcasts</p>
       <ul className="mb-5 space-y-2">
-        {podcasts.slice(0, 3).map((podcast) => (
+        {podcasts
+          .filter((item) => !item.premium)
+          .slice(0, 3)
+          .map((podcast) => (
           <li key={podcast.id}>
             <button
               type="button"
