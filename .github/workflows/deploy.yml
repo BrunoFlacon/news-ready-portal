@@ -38,6 +38,9 @@ jobs:
 
       - name: Build de produção
         run: npm run build
+        env:
+          VITE_RADIO_STREAM_URL: https://shoutcast2.s12.com.br:16002/stream
+          VITE_WHATSAPP_NUMBER: 55149999256955
 
       # Fallback SPA: rotas como /noticias abrem o 404.html, que carrega o
       # mesmo JS e o react-router renderiza a rota correta.

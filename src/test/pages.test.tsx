@@ -29,7 +29,6 @@ describe("Home (área da rádio — separada das notícias)", () => {
     expect(screen.getByRole("heading", { name: "Podcasts" })).toBeInTheDocument();
 
     // Seção dividida de entretenimento: reels e stories lado a lado.
-    expect(screen.getByRole("heading", { name: "Entretenimento" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Reels da redação" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Stories em destaque" })).toBeInTheDocument();
 

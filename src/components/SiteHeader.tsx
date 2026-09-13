@@ -36,7 +36,7 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-xl">
-      <div className="container flex min-h-20 items-center justify-between gap-4 py-3">
+      <div className="container flex items-center justify-between gap-4 py-3">
         <Link to="/" className="flex min-w-0 items-center gap-3">
           <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-md bg-brand text-brand-foreground shadow-brand">
             <Radio className="h-5 w-5" />

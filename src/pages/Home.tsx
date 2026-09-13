@@ -627,12 +627,6 @@ function EntertainmentBand({ onSelectId }: { onSelectId: (id: string) => void })
   return (
     <section className="page-band border-y border-border bg-card">
       <div className="container">
-        <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="font-serif text-3xl font-bold md:text-4xl">Entretenimento</h2>
-            <p className="mt-2 text-muted-foreground">Reels e stories produzidos pela redação.</p>
-          </div>
-        </div>
         <div className="grid gap-10 lg:grid-cols-2">
           <MediaRail
             title="Reels da redação"
