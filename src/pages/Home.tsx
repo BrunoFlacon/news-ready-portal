@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import {
+  Captions,
   Crown,
   Heart,
   Lock,
@@ -9,9 +10,12 @@ import {
   Play,
   Radio,
   Users,
+  Volume1,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { Layout } from "@/components/Layout";
 import { MediaRail } from "@/components/MediaRail";
@@ -23,6 +27,7 @@ import {
   institutionalServices,
   schedule,
   socialMedia,
+  stories,
   upcomingLive,
   watchFeed,
   watchRecommendations,
@@ -34,6 +39,15 @@ const institutionalImage = "https://images.unsplash.com/photo-1590602847861-f357
 const AUTO_ROTATE_MS = 8000;
 const TRANSITION_MS = 12000;
 const AD_STEP_MS = 4000;
+const UI_HIDE_MS = 10000;
+
+/** Descrição curta exibida no carrossel e no painel de informações do player. */
+const watchBlurb = (item: WatchFeedItem) =>
+  item.kind === "live"
+    ? "Transmissão ao vivo da programação Web Rádio Vitória."
+    : item.kind === "video"
+      ? "Matéria e cortes produzidos pela redação da Web Rádio Vitória."
+      : "Conteúdo rápido em formato vertical, direto da redação.";
 
 /** Alvo da assinatura premium (reapresentações de lives e podcasts na íntegra). */
 export interface PremiumTarget {
@@ -56,6 +70,8 @@ interface WatchOverlayProps {
   adIndex: number;
   ambient: AmbientPalette;
   uiVisible: boolean;
+  onShowUi: () => void;
+  onHideUi: () => void;
   onToggleUi: () => void;
   onClose: () => void;
   onEnded: () => void;
@@ -67,6 +83,8 @@ function WatchOverlay({
   adIndex,
   ambient,
   uiVisible,
+  onShowUi,
+  onHideUi,
   onToggleUi,
   onClose,
   onEnded,
@@ -77,32 +95,50 @@ function WatchOverlay({
   const next = phase === "transition" ? watch.next : null;
   const vertical = item.orientation === "vertical";
 
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(0.85);
+  const [cc, setCc] = useState(true);
+
+  // Aplica volume/mudo ao vídeo — inclusive quando o item troca de mídia.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) {
+      video.muted = muted;
+      video.volume = volume;
+    }
+  }, [muted, volume, item.id]);
+
   const mediaBox = vertical ? (
     // Reels/stories em 9:16 centralizado, limitado pela altura da tela.
     <div className="relative aspect-[9/16] h-full max-h-[62vh] w-auto overflow-hidden rounded-lg bg-black shadow-2xl">
       <video
         key={item.id}
+        ref={videoRef}
         data-testid="watch-media"
         src={item.videoUrl}
         autoPlay
         controls
         playsInline
+        muted={muted}
         onEnded={onEnded}
         className="h-full w-full object-contain"
       />
     </div>
   ) : (
-    // Vídeos/lives em 16:9: o contêiner ocupa TUDO o espaço do banner e o
-    // vídeo cresce até preencher (object-contain preserva a proporção sem
-    // cortes — as sobras mostram o fundo ambiente animado).
+    // Vídeos/lives em 16:9: o contêiner ocupa TODO o banner e o vídeo cresce
+    // até preencher a tela (object-contain preserva a proporção sem cortes —
+    // as sobras mostram o fundo ambiente animado).
     <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden rounded-lg shadow-2xl">
       <video
         key={item.id}
+        ref={videoRef}
         data-testid="watch-media"
         src={item.videoUrl}
         autoPlay
         controls
         playsInline
+        muted={muted}
         onEnded={onEnded}
         className="max-h-full max-w-full object-contain"
       />
@@ -114,80 +150,147 @@ function WatchOverlay({
       data-testid="watch-overlay"
       className="fixed inset-0 z-[90] lg:absolute lg:inset-0 lg:z-30"
       style={{ "--ambient-a": ambient.a, "--ambient-b": ambient.b } as CSSProperties}
+      onMouseEnter={onShowUi}
+      onMouseLeave={onHideUi}
     >
       {!transitioning && (
         <>
           <div className="ambient-blob left-[-10%] top-[-20%] h-[80%] w-[70%]" style={{ background: ambient.a }} />
           <div className="ambient-blob ambient-blob-2 bottom-[-20%] right-[-10%] h-[80%] w-[70%]" style={{ background: ambient.b }} />
           <div className="ambient-dim" />
-          <div className="absolute left-0 right-0 top-0 z-10 flex items-center justify-between p-4">
-            <span className="inline-flex items-center gap-2 rounded-sm bg-background/85 px-2.5 py-1 text-[10px] font-bold uppercase text-foreground">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live" />
-              {item.kicker} • {vertical ? "Formato vertical" : "Tela ampla"}
-            </span>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Fechar player"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+
+          {/* O vídeo preenche o banner inteiro; toque alterna a UI no mobile */}
           <div
-            className={cn(
-              "relative grid h-full lg:grid-cols-[1fr_20rem]",
-              uiVisible ? "flex-col" : "flex",
-            )}
+            className="absolute inset-0 z-10 flex items-center justify-center"
             onPointerDown={() => {
               if (vertical) {
                 onToggleUi();
               }
             }}
           >
-            <div className="flex min-h-0 flex-1 items-center justify-center p-2 lg:p-4">
-              {mediaBox}
-            </div>
-            <aside
+            {mediaBox}
+          </div>
+
+          {/* Tarja superior esquerda: AO VIVO sempre visível; demais no hover */}
+          <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-4">
+            {item.kind === "live" ? (
+              <span
+                data-testid="watch-live-badge"
+                className="inline-flex items-center gap-2 rounded-sm bg-live px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-live-foreground shadow-lg"
+              >
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" />
+                Ao vivo
+              </span>
+            ) : (
+              <span
+                className={cn(
+                  "rounded-sm bg-background/85 px-2.5 py-1 text-[10px] font-bold uppercase text-foreground shadow-lg transition-opacity",
+                  uiVisible ? "opacity-100" : "opacity-0",
+                )}
+              >
+                {item.kicker} • {vertical ? "Formato vertical" : "Tela ampla"}
+              </span>
+            )}
+
+            {/* Controles: mudo, volume, legendas (CC) e fechar */}
+            <div
               className={cn(
-                "flex-col justify-between gap-4 overflow-y-auto p-5 lg:flex",
-                uiVisible ? "flex" : "hidden",
+                "flex items-center gap-2 transition-opacity",
+                uiVisible ? "opacity-100" : "pointer-events-none opacity-0",
               )}
             >
-              <div>
+              <button
+                type="button"
+                onClick={() => setMuted((value) => !value)}
+                aria-label={muted ? "Ativar som do vídeo" : "Silenciar vídeo"}
+                aria-pressed={muted}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
+              >
+                {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setVolume((value) => Math.max(0.1, Math.round((value - 0.15) * 100) / 100))}
+                aria-label="Abaixar o volume do vídeo"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
+              >
+                <Volume1 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setVolume((value) => Math.min(1, Math.round((value + 0.15) * 100) / 100))}
+                aria-label="Aumentar o volume do vídeo"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
+              >
+                <Volume2 className="h-4 w-4" />
+              </button>
+              <span className="hidden w-10 text-center text-[10px] font-bold tabular-nums text-foreground sm:inline">
+                {Math.round(volume * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() => setCc((value) => !value)}
+                aria-label="Legendas do vídeo"
+                aria-pressed={cc}
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+                  cc ? "bg-brand text-brand-foreground" : "bg-background/85 text-foreground hover:bg-background",
+                )}
+              >
+                <Captions className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Fechar player"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Legenda (CC) sobre o vídeo, como no YouTube */}
+          {cc && (
+            <div
+              data-testid="watch-caption"
+              className="pointer-events-none absolute inset-x-0 bottom-16 z-20 flex justify-center px-4 lg:bottom-24"
+            >
+              <p className="max-w-3xl rounded-md bg-black/60 px-4 py-2 text-center text-sm leading-relaxed text-white backdrop-blur-sm">
+                {item.caption}
+              </p>
+            </div>
+          )}
+
+          {/* Painel de informações: título, descrição e "a seguir" (hover/toque; some após 10s) */}
+          <div
+            className={cn(
+              "absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-4 pb-3 pt-16 transition-opacity duration-300 lg:px-6",
+              uiVisible ? "opacity-100" : "pointer-events-none opacity-0",
+            )}
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              if (vertical) {
+                onToggleUi();
+              }
+            }}
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div className="min-w-0 max-w-2xl">
                 <p className="editorial-kicker">{item.kicker}</p>
-                <h3 className="mt-2 font-serif text-xl font-bold text-foreground lg:text-2xl">{item.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  {item.kind === "live"
-                    ? "Transmissão ao vivo da programação Web Rádio Vitória."
-                    : item.kind === "video"
-                      ? "Matéria e cortes produzidos pela redação da Web Rádio Vitória."
-                      : "Conteúdo rápido em formato vertical, direto da redação."}
-                </p>
-                <div className="mt-5 rounded-md border border-border bg-card p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-brand">Legenda do áudio</p>
-                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{item.caption}</p>
-                </div>
+                <h3 className="font-serif text-lg font-bold leading-snug text-overlay-foreground lg:text-2xl">{item.title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-overlay-muted">{watchBlurb(item)}</p>
               </div>
               {next && (
-                <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
-                  <img src={next.image} alt="" className="h-14 w-14 flex-shrink-0 rounded object-cover" />
+                <div className="flex w-fit shrink-0 items-center gap-3 rounded-md bg-black/50 p-2 backdrop-blur-sm">
+                  <img src={next.image} alt="" className="h-12 w-12 flex-shrink-0 rounded object-cover" />
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase text-brand">A seguir</p>
-                    <p className="truncate text-xs font-bold text-foreground">{next.title}</p>
+                    <p className="max-w-40 truncate text-xs font-bold text-white">{next.title}</p>
                   </div>
                 </div>
               )}
-            </aside>
-          </div>
-          <div
-            className={cn(
-              "absolute bottom-4 left-4 right-4 z-10 flex items-center justify-between gap-3 sm:hidden",
-              uiVisible ? "flex" : "hidden",
-            )}
-          >
-            <span className="min-w-0 truncate text-xs font-bold text-overlay-foreground">{item.title}</span>
-            <span className="flex-shrink-0 text-[10px] uppercase text-overlay-muted">{item.kicker}</span>
+            </div>
           </div>
         </>
       )}
@@ -334,18 +437,24 @@ function RadioHero({
     };
   }, [watchImage]);
 
-  // Auto-ocultar a UI (mobile) depois de iniciar a reprodução, como no YouTube.
-  // A chave `mediaId` muda a cada novo item reproduzido (e some na transição),
-  // então o efeito reseta o temporizador sem depender do objeto `watch` inteiro.
+  // Ao iniciar a reprodução, reapresenta a UI (título/controles).
   const mediaId = watch?.phase === "playing" ? watch.item.id : null;
   useEffect(() => {
     if (!mediaId) {
       return;
     }
     setUiVisible(true);
-    const timer = window.setTimeout(() => setUiVisible(false), 2800);
-    return () => window.clearTimeout(timer);
   }, [mediaId]);
+
+  // Estilo YouTube: o título/descrição e os controles somem após 10s de
+  // inatividade, deixando o vídeo em tela cheia dentro do banner.
+  useEffect(() => {
+    if (!mediaId || !uiVisible) {
+      return;
+    }
+    const timer = window.setTimeout(() => setUiVisible(false), UI_HIDE_MS);
+    return () => window.clearTimeout(timer);
+  }, [mediaId, uiVisible]);
 
   // Fase de transição: alterna manchete/próximo, anúncio premium e grade, e
   // dispara o play automático do próximo em 3 segundos.
@@ -398,24 +507,25 @@ function RadioHero({
                     De Tupã para todo o Brasil
                   </span>
                 </div>
-                <h1 className="font-serif text-4xl font-bold leading-tight text-overlay-foreground md:text-6xl">
-                  Web Rádio Vitória
-                </h1>
-                <p className="mt-4 max-w-2xl text-base leading-relaxed text-overlay-muted md:text-lg">
-                  24 horas de programação ao vivo com música, informação e fé — e uma
-                  biblioteca de vídeos, lives, reels e stories para assistir quando quiser.
-                </p>
-                <div className="mt-8 flex flex-wrap items-center gap-3">
-                  {hasStream && (
-                    <button type="button" onClick={player.openPlayer} className="btn-brand px-10 py-4 text-sm font-bold shadow-xl transition-all duration-200 hover:shadow-2xl">
-                      <Play className="h-5 w-5 fill-current" /> Ouvir Agora
-                    </button>
-                  )}
-                  <Button asChild variant="outline" size="lg">
-                    <Link to="/noticias">
-                      <Newspaper className="h-5 w-5" /> Acessar Vitória News
-                    </Link>
-                  </Button>
+                <div className="flex items-start gap-4 sm:gap-5">
+                  <span className="mt-1 hidden h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg sm:flex">
+                    <Play className="h-5 w-5 translate-x-0.5 fill-current" />
+                  </span>
+                  <div className="min-w-0">
+                    <h1 className="font-serif text-3xl font-bold leading-tight text-overlay-foreground md:text-5xl">
+                      {active.title}
+                    </h1>
+                    <p className="mt-3 max-w-2xl text-base leading-relaxed text-overlay-muted md:text-lg">
+                      {watchBlurb(active)}
+                    </p>
+                    <div className="mt-6">
+                      <Button asChild variant="outline" size="lg">
+                        <Link to="/noticias">
+                          <Newspaper className="h-5 w-5" /> Acessar Vitória News
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -469,6 +579,8 @@ function RadioHero({
           adIndex={adIndex}
           ambient={ambient}
           uiVisible={uiVisible}
+          onShowUi={() => setUiVisible(true)}
+          onHideUi={() => setUiVisible(false)}
           onToggleUi={() => setUiVisible((visible) => !visible)}
           onClose={onCloseWatch}
           onEnded={onEnded}
@@ -639,20 +751,36 @@ function ProgrammingSection({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Reels (faixa única — a seção Entretenimento/Reels e stories foi removida) */
+/* Entretenimento (Reels e stories — seção dividida)                          */
 /* -------------------------------------------------------------------------- */
 
-function ReelsBand({ onSelectId }: { onSelectId: (id: string) => void }) {
+function EntertainmentBand({ onSelectId }: { onSelectId: (id: string) => void }) {
   return (
     <section className="page-band border-y border-border bg-card">
       <div className="container">
-        <MediaRail
-          title="Reels"
-          eyebrow="Web Rádio"
-          items={socialMedia}
-          portrait
-          onSelect={(item) => onSelectId(item.id)}
-        />
+        <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="editorial-kicker">Web Rádio</p>
+            <h2 className="mt-2 font-serif text-3xl font-bold md:text-4xl">Entretenimento</h2>
+            <p className="mt-2 text-muted-foreground">Reels e stories produzidos pela redação.</p>
+          </div>
+        </div>
+        <div className="grid gap-10 lg:grid-cols-2">
+          <MediaRail
+            title="Reels da redação"
+            eyebrow="Reels"
+            items={socialMedia}
+            portrait
+            onSelect={(item) => onSelectId(item.id)}
+          />
+          <MediaRail
+            title="Stories em destaque"
+            eyebrow="Stories"
+            items={stories}
+            portrait
+            onSelect={(item) => onSelectId(item.id)}
+          />
+        </div>
       </div>
     </section>
   );
@@ -824,7 +952,7 @@ export default function Home() {
         onPremiumRequest={openPremium}
       />
       <ProgrammingSection onPlay={playNow} onPremium={openPremium} />
-      <ReelsBand onSelectId={selectWatchById} />
+      <EntertainmentBand onSelectId={selectWatchById} />
       <InstitutionalBand />
       {premium && <PremiumPanel target={premium} onClose={() => setPremium(null)} />}
     </Layout>

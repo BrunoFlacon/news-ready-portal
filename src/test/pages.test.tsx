@@ -28,14 +28,10 @@ describe("Home (área da rádio — separada das notícias)", () => {
     expect(screen.getByRole("heading", { name: /Programação/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Podcasts" })).toBeInTheDocument();
 
-    // Faixa única de reels (a seção "Entretenimento/Reels e stories" saiu)
-    expect(screen.getByRole("heading", { name: "Reels" })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("heading", { name: /Reels e stories/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("heading", { name: /Stories em destaque/i }),
-    ).not.toBeInTheDocument();
+    // Seção dividida de entretenimento: reels e stories lado a lado.
+    expect(screen.getByRole("heading", { name: "Entretenimento" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Reels da redação" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Stories em destaque" })).toBeInTheDocument();
 
     // A seção de vídeos e lives saiu: o conteúdo migrou para o banner gigante.
     expect(

@@ -369,8 +369,8 @@ describe("Home — player imersivo no banner gigante", () => {
     expect(media).toHaveAttribute("src", expect.stringContaining("?v=reel-1"));
     // Reels/stories entram centralizados em 9:16.
     expect(media.parentElement).toHaveClass("aspect-[9/16]");
-    // Legenda do áudio aparece na lateral direita.
-    expect(screen.getAllByText(/Legenda do áudio/i).length).toBeGreaterThan(0);
+    // Legenda (CC) sobre o vídeo, como no YouTube.
+    expect(screen.getByTestId("watch-caption")).toHaveTextContent(/Legenda do áudio/i);
   });
 
   it("reproduz a live no banner ao clicar na linha da programação", () => {
@@ -387,6 +387,8 @@ describe("Home — player imersivo no banner gigante", () => {
       "src",
       expect.stringContaining("?v=live-now-1"),
     );
+    // Tarja "AO VIVO" fixa no canto superior esquerdo do player.
+    expect(screen.getByTestId("watch-live-badge")).toBeInTheDocument();
   });
 
   it("ao terminar, alterna próximo/anúncio premium/grade e reproduz automaticamente em 3 segundos", () => {
@@ -444,6 +446,66 @@ describe("Home — player imersivo no banner gigante", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Fechar player/i }));
     expect(screen.queryByTestId("watch-overlay")).not.toBeInTheDocument();
+  });
+
+  it("silencia e restaura o volume do vídeo pelos controles do overlay", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Assistir Inteligência artificial na saúde/i,
+      }),
+    );
+    const media = screen.getByTestId("watch-media") as HTMLVideoElement;
+
+    fireEvent.click(screen.getByRole("button", { name: /Silenciar vídeo/i }));
+    expect(media.muted).toBe(true);
+    expect(
+      screen.getByRole("button", { name: /Ativar som do vídeo/i }),
+    ).toBeInTheDocument();
+
+    // Abaixa o volume (15% por passo) e aplica na mídia.
+    fireEvent.click(screen.getByRole("button", { name: /Abaixar o volume do vídeo/i }));
+    expect(media.volume).toBeLessThan(1);
+
+    fireEvent.click(screen.getByRole("button", { name: /Ativar som do vídeo/i }));
+    expect(media.muted).toBe(false);
+  });
+
+  it("alterna as legendas (CC) sobre o vídeo", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Assistir Inteligência artificial na saúde/i,
+      }),
+    );
+    expect(screen.getByTestId("watch-caption")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Legendas do vídeo/i }));
+    expect(screen.queryByTestId("watch-caption")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Legendas do vídeo/i }));
+    expect(screen.getByTestId("watch-caption")).toBeInTheDocument();
+  });
+
+  it("no hero em repouso mostra o título e a descrição do vídeo em destaque", () => {
+    renderWithProviders(<Home />);
+
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: /Entenda o novo pacote de infraestrutura digital/i,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Matéria e cortes produzidos pela redação/i).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("link", { name: /Acessar Vitória News/i }),
+    ).toBeInTheDocument();
   });
 });
 
