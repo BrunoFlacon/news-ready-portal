@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Crown,
   Heart,
@@ -764,6 +764,18 @@ function PremiumPanel({ target, onClose }: { target: PremiumTarget; onClose: () 
 export default function Home() {
   const [watch, setWatch] = useState<WatchState | null>(null);
   const [premium, setPremium] = useState<PremiumTarget | null>(null);
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // O botão "Assine" do topo aponta para a assinatura: abre o painel premium
+  // e limpa o hash da URL para o painel não reaparecer em recarregamentos.
+  useEffect(() => {
+    if (location.hash === "#assinatura") {
+      setPremium({ kind: "premium", title: "Área Premium da Web Rádio Vitória" });
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.hash, navigate, location.pathname]);
 
   const playNow = useCallback((item: WatchFeedItem) => {
     setPremium(null);

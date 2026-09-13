@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Radio, Play, Headphones, Newspaper } from "lucide-react";
+import { Menu, X, Radio, Play, Newspaper, Crown } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -42,69 +42,94 @@ export function SiteHeader() {
       <div className="container flex min-h-20 items-center justify-between gap-4 py-3">
         <Link to="/" className="flex min-w-0 items-center gap-3">
           <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-md bg-brand text-brand-foreground shadow-brand">
-            <Radio className="h-5 w-5" /><span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-background bg-live" />
+            <Radio className="h-5 w-5" />
+            <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-background bg-live" />
           </span>
-          <span className="min-w-0"><strong className="block truncate font-serif text-lg text-foreground">Web Rádio Vitória</strong><small className="block truncate text-[10px] uppercase text-muted-foreground">Notícias • Informação • Fé</small></span>
+          <span className="min-w-0">
+            <strong className="block truncate font-serif text-lg text-foreground">Web Rádio Vitória</strong>
+            <small className="block truncate text-[10px] uppercase text-muted-foreground">Notícias • Informação • Fé</small>
+          </span>
         </Link>
-        <div className="hidden items-center gap-3 lg:flex">
+
+        <div className="relative flex items-center gap-2 lg:gap-6">
           {isLiveOnAir && (
-            <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase text-live"><span className="h-2 w-2 animate-pulse rounded-full bg-live" />Ao vivo</span>
+            <span className="hidden items-center gap-2 text-xs font-semibold uppercase text-live lg:inline-flex">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-live" />Ao vivo
+            </span>
           )}
           {showListenButton && (
             <button
               type="button"
               onClick={player.openPlayer}
-              className="btn-brand h-9 px-4"
+              className="btn-brand hidden h-9 px-4 lg:inline-flex"
             >
               <Play className="h-4 w-4 fill-current" />
               Ouvir Agora
             </button>
           )}
-          <Button asChild size="sm"><Link to="/contato"><Headphones /> Fale conosco</Link></Button>
+
+          {/* Navegação na mesma linha do topo: menu compacto à direita no
+              desktop e menu expansível no mobile — a barra separada foi
+              removida para liberar espaço para o banner gigante. */}
+          <nav
+            aria-label="Navegação principal"
+            className={cn(
+              "absolute right-0 top-full z-50 mt-2 w-56 rounded-md border border-border bg-card p-2 shadow-xl lg:static lg:mt-0 lg:flex lg:w-auto lg:items-center lg:gap-6 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none",
+              menuOpen ? "block" : "hidden lg:flex",
+            )}
+          >
+            <ul className="flex flex-col lg:flex-row lg:items-center lg:gap-6">
+              {navItems.map((item) => {
+                const isActive = isNavActive(item.path);
+                return (
+                  <li key={item.path}>
+                    <Link
+                      to={item.path}
+                      aria-current={isActive ? "page" : undefined}
+                      className={cn(
+                        "block border-l-2 px-4 py-3 text-xs font-bold uppercase transition-colors lg:border-b-2 lg:border-l-0 lg:px-0 lg:py-1.5",
+                        isActive
+                          ? "border-primary text-foreground"
+                          : "border-transparent text-muted-foreground hover:text-foreground",
+                      )}
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      {item.label === "Vitória News" ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Newspaper className="h-3.5 w-3.5" />
+                          {item.label}
+                        </span>
+                      ) : (
+                        item.label
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          {/* CTA de assinatura no lugar do antigo botão "Fale conosco" — o
+              contato agora vive somente no rodapé. */}
+          <Button asChild size="sm">
+            <Link to="/#assinatura">
+              <Crown className="h-3.5 w-3.5" />
+              Assine
+            </Link>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? <X /> : <Menu />}
+          </Button>
         </div>
-        <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={menuOpen}>
-          {menuOpen ? <X /> : <Menu />}
-        </Button>
       </div>
-      <nav className="border-t border-border" aria-label="Navegação principal">
-        <div className="container">
-          <ul className={`${menuOpen ? "flex" : "hidden"} flex-col lg:flex lg:flex-row lg:items-center`}>
-            {navItems.map((item) => {
-              const isActive = isNavActive(item.path);
-              return (
-                <li key={item.path}>
-                  <Link
-                    to={item.path}
-                    aria-current={isActive ? "page" : undefined}
-                    className={cn(
-                      "block border-l-2 px-4 py-3 text-xs font-bold uppercase transition-colors lg:border-b-2 lg:border-l-0",
-                      isActive
-                        ? "border-primary text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground",
-                    )}
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    {item.label === "Vitória News" ? (
-                      <span className="inline-flex items-center gap-1.5"><Newspaper className="h-3.5 w-3.5" />{item.label}</span>
-                    ) : (
-                      item.label
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-            <li className="lg:hidden">
-              <Link
-                to="/contato"
-                onClick={() => setMenuOpen(false)}
-                className="block border-l-2 border-transparent px-4 py-3 text-xs font-bold uppercase text-muted-foreground hover:text-foreground"
-              >
-                Fale conosco
-              </Link>
-            </li>
-          </ul>
-        </div>
-      </nav>
     </header>
   );
 }

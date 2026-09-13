@@ -79,25 +79,41 @@ describe("Home (área da rádio — separada das notícias)", () => {
     expect(screen.queryByRole("heading", { name: /Mais notícias/i })).not.toBeInTheDocument();
   });
 
-  it("expõe os acessos para Vitória News, institucional e contato (sem item Contato no menu)", () => {
+  it("expõe no topo os acessos para o portal, institucional e assinatura, com contato só no rodapé", () => {
     renderWithProviders(<Home />);
 
-    const vitoriaNewsLinks = screen.getAllByRole("link", { name: "Vitória News" });
+    const header = screen.getByRole("banner");
+
+    const vitoriaNewsLinks = within(header).getAllByRole("link", { name: "Vitória News" });
     expect(vitoriaNewsLinks.length).toBeGreaterThan(0);
     expect(vitoriaNewsLinks[0]).toHaveAttribute("href", "/noticias");
 
-    expect(screen.getByRole("link", { name: "Institucional" })).toHaveAttribute(
+    expect(within(header).getByRole("link", { name: "Institucional" })).toHaveAttribute(
       "href",
       "/#institucional",
     );
 
-    // O menu principal não tem mais o item "Contato" — ele foi substituído
-    // pelo botão "Fale conosco" no topo do site.
-    const navigation = screen.getByRole("navigation", { name: /Navegação principal/i });
-    expect(within(navigation).queryByRole("link", { name: "Contato" })).not.toBeInTheDocument();
-    expect(
-      screen.getAllByRole("link", { name: /Fale conosco/i })[0],
-    ).toHaveAttribute("href", "/contato");
+    // O menu do topo não tem "Contato" nem "Fale conosco" — o contato vive
+    // apenas no rodapé, e o CTA do topo agora é a assinatura.
+    expect(within(header).queryByRole("link", { name: /Fale conosco/i })).not.toBeInTheDocument();
+    expect(within(header).getByRole("link", { name: "Assine" })).toHaveAttribute(
+      "href",
+      "/#assinatura",
+    );
+
+    const footer = screen.getByRole("contentinfo");
+    expect(within(footer).getByRole("link", { name: "Contato" })).toHaveAttribute(
+      "href",
+      "/contato",
+    );
+  });
+
+  it("a rota '#assinatura' (botão Assine do topo) abre o painel premium na home", () => {
+    renderWithProviders(<Home />, { route: "/#assinatura" });
+
+    const panel = screen.getByTestId("premium-panel");
+    expect(within(panel).getByRole("heading", { name: /Área Premium da Web Rádio Vitória/i })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: /Assinar a área premium/i })).toBeInTheDocument();
   });
 
   it("não expõe botão de pause no cabeçalho (controles ficam nas barras)", () => {
