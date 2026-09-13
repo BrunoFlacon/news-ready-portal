@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 describe("Home (área da rádio — separada das notícias)", () => {
-  it("renderiza as seções da rádio: hero, programação, podcasts e entretenimento", () => {
+  it("renderiza as seções da rádio: hero, programação, podcasts e reels", () => {
     renderWithProviders(<Home />);
 
     // Hero da rádio (o rodapé repete a marca em heading próprio)
@@ -28,10 +28,14 @@ describe("Home (área da rádio — separada das notícias)", () => {
     expect(screen.getByRole("heading", { name: /Programação/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Podcasts" })).toBeInTheDocument();
 
-    // Entretenimento: reels + stories em duas faixas
-    expect(screen.getByRole("heading", { name: /Reels e stories/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Reels da redação/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Stories em destaque/i })).toBeInTheDocument();
+    // Faixa única de reels (a seção "Entretenimento/Reels e stories" saiu)
+    expect(screen.getByRole("heading", { name: "Reels" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /Reels e stories/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /Stories em destaque/i }),
+    ).not.toBeInTheDocument();
 
     // A seção de vídeos e lives saiu: o conteúdo migrou para o banner gigante.
     expect(
@@ -56,7 +60,7 @@ describe("Home (área da rádio — separada das notícias)", () => {
     ).toBeInTheDocument();
     // Cada linha mostra o apresentador e o horário da grade.
     expect(within(grid).getAllByText(/Apresentador\(a\):/i).length).toBeGreaterThan(0);
-    expect(within(grid).getByText("19h")).toBeInTheDocument();
+    expect(within(grid).getByText(/19h/)).toBeInTheDocument();
   });
 
   it("renderiza a área institucional apenas ao acessar com o hash #institucional", () => {

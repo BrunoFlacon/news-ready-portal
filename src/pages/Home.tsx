@@ -1,11 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import {
-  ArrowRight,
-  ChevronDown,
-  ChevronUp,
   Crown,
   Heart,
-  Info,
   Lock,
   Mic2,
   Newspaper,
@@ -15,7 +11,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { Layout } from "@/components/Layout";
 import { MediaRail } from "@/components/MediaRail";
@@ -27,7 +23,6 @@ import {
   institutionalServices,
   schedule,
   socialMedia,
-  stories,
   upcomingLive,
   watchFeed,
   watchRecommendations,
@@ -36,9 +31,9 @@ import {
 } from "@/data/media";
 
 const institutionalImage = "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800&q=80";
-const AUTO_ROTATE_MS = 7000;
-const TRANSITION_MS = 3000;
-const AD_STEP_MS = 1000;
+const AUTO_ROTATE_MS = 8000;
+const TRANSITION_MS = 12000;
+const AD_STEP_MS = 4000;
 
 /** Alvo da assinatura premium (reapresentações de lives e podcasts na íntegra). */
 export interface PremiumTarget {
@@ -83,6 +78,7 @@ function WatchOverlay({
   const vertical = item.orientation === "vertical";
 
   const mediaBox = vertical ? (
+    // Reels/stories em 9:16 centralizado, limitado pela altura da tela.
     <div className="relative aspect-[9/16] h-full max-h-[62vh] w-auto overflow-hidden rounded-lg bg-black shadow-2xl">
       <video
         key={item.id}
@@ -96,7 +92,10 @@ function WatchOverlay({
       />
     </div>
   ) : (
-    <div className="aspect-video w-full max-w-5xl overflow-hidden rounded-lg bg-black shadow-2xl">
+    // Vídeos/lives em 16:9: o contêiner ocupa TUDO o espaço do banner e o
+    // vídeo cresce até preencher (object-contain preserva a proporção sem
+    // cortes — as sobras mostram o fundo ambiente animado).
+    <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden rounded-lg shadow-2xl">
       <video
         key={item.id}
         data-testid="watch-media"
@@ -105,7 +104,7 @@ function WatchOverlay({
         controls
         playsInline
         onEnded={onEnded}
-        className="h-full w-full object-contain"
+        className="max-h-full max-w-full object-contain"
       />
     </div>
   );
@@ -146,7 +145,7 @@ function WatchOverlay({
               }
             }}
           >
-            <div className="flex min-h-0 flex-1 items-center justify-center p-3 lg:p-6">
+            <div className="flex min-h-0 flex-1 items-center justify-center p-2 lg:p-4">
               {mediaBox}
             </div>
             <aside
@@ -533,7 +532,6 @@ function ProgrammingSection({
   onPremium: (target: PremiumTarget) => void;
 }) {
   const player = useRadioPlayerContext();
-  const [open, setOpen] = useState(true);
 
   const handleRow = (entry: ScheduleEntry) => {
     if (entry.premium) {
@@ -566,62 +564,48 @@ function ProgrammingSection({
 
   return (
     <section className="page-band">
-      <div className="container space-y-10">
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
-          className="flex w-full items-center justify-between gap-4 border-b border-border pb-4 text-left"
-        >
+      <div className="container grid gap-10 lg:grid-cols-[17rem_1fr]">
+        {/* Menu lateral da programação — esquerda, como no layout original */}
+        <aside className="space-y-5">
           <div>
             <p className="editorial-kicker">Web Rádio</p>
-            <h2 className="mt-2 font-serif text-3xl font-bold">Programação</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Horários de programas, lives e podcasts. Itens marcados como premium mostram apenas data, hora, nome e apresentador.
+            <h2 className="mt-2 font-serif text-2xl font-bold">Programação</h2>
+            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+              Clique em cada horário para assistir a live no banner ou ouvir a prévia do podcast.
             </p>
           </div>
-          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-            {open ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-          </span>
-        </button>
-
-        {open && (
-          <div className="grid gap-3" data-testid="schedule-grid">
-            {schedule.map((entry) => (
+          <div className="space-y-3" data-testid="schedule-grid">
+            {schedule.map((entry, index) => (
               <button
                 key={entry.id}
                 type="button"
                 onClick={() => handleRow(entry)}
-                className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-4 gap-y-1 rounded-md border border-border bg-card p-4 text-left transition-colors hover:border-brand/50"
-              >
-                <span className="row-span-2 w-24 text-[10px] font-bold uppercase leading-tight text-muted-foreground">{entry.day}</span>
-                <span className="rounded bg-secondary px-2 py-1 text-xs font-bold tabular-nums text-secondary-foreground">{entry.time}</span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-bold text-foreground">{entry.title}</span>
-                  <span className="block text-xs text-muted-foreground">Apresentador(a): {entry.host}</span>
-                </span>
-                {entry.premium ? (
-                  <span className="inline-flex items-center gap-1 rounded-sm bg-secondary px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground">
-                    <Lock className="h-3 w-3" /> Premium
-                  </span>
-                ) : entry.kind === "live" ? (
-                  <span className="inline-flex items-center gap-1 rounded-sm bg-live px-2 py-1 text-[10px] font-bold uppercase text-live-foreground">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" /> Ao vivo
-                  </span>
-                ) : entry.kind === "podcast" ? (
-                  <span className="inline-flex items-center gap-1 rounded-sm bg-secondary px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground">
-                    <Play className="h-3 w-3" /> Podcast
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 rounded-sm bg-secondary px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground">
-                    <Info className="h-3 w-3" /> Programa
-                  </span>
+                aria-label={`${entry.day} • ${entry.time} — ${entry.title} (apresentador(a): ${entry.host})`}
+                className={cn(
+                  "block w-full border-l-2 p-4 text-left transition-colors",
+                  index === 0 ? "border-brand bg-card" : "border-border hover:border-brand/60",
                 )}
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-bold uppercase text-brand">{entry.day} • {entry.time}</span>
+                  {entry.premium ? (
+                    <span className="inline-flex items-center gap-1 rounded-sm bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
+                      <Lock className="h-2.5 w-2.5" /> Premium
+                    </span>
+                  ) : entry.kind === "live" ? (
+                    <span className="inline-flex items-center gap-1 rounded-sm bg-live px-1.5 py-0.5 text-[9px] font-bold uppercase text-live-foreground">
+                      <span className="h-1 w-1 animate-pulse rounded-full bg-live-foreground" /> Ao vivo
+                    </span>
+                  ) : null}
+                </span>
+                <h3 className="mt-1.5 text-sm font-bold leading-snug text-foreground">{entry.title}</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Apresentador(a): {entry.host}</p>
               </button>
             ))}
           </div>
-        )}
+        </aside>
 
+        {/* Podcasts sob demanda — conteúdo principal à direita */}
         <div>
           <div className="mb-6 flex items-end justify-between border-b border-border pb-4">
             <div>
@@ -655,27 +639,20 @@ function ProgrammingSection({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Entretenimento (reels | stories)                                          */
+/* Reels (faixa única — a seção Entretenimento/Reels e stories foi removida) */
 /* -------------------------------------------------------------------------- */
 
-function EntertainmentBand({ onSelectId }: { onSelectId: (id: string) => void }) {
-  const selectWatch = (id: string) => onSelectId(id);
+function ReelsBand({ onSelectId }: { onSelectId: (id: string) => void }) {
   return (
     <section className="page-band border-y border-border bg-card">
-      <div className="container space-y-12">
-        <div className="flex items-end justify-between border-b border-border pb-4">
-          <div>
-            <p className="editorial-kicker">Entretenimento</p>
-            <h2 className="mt-2 font-serif text-3xl font-bold">Reels e stories</h2>
-          </div>
-          <span className="hidden text-xs text-muted-foreground md:inline">
-            Clique para assistir no banner
-          </span>
-        </div>
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <MediaRail title="Reels da redação" eyebrow="Reels" items={socialMedia} portrait onSelect={(item) => selectWatch(item.id)} />
-          <MediaRail title="Stories em destaque" eyebrow="Stories" items={stories} portrait onSelect={(item) => selectWatch(item.id)} />
-        </div>
+      <div className="container">
+        <MediaRail
+          title="Reels"
+          eyebrow="Web Rádio"
+          items={socialMedia}
+          portrait
+          onSelect={(item) => onSelectId(item.id)}
+        />
       </div>
     </section>
   );
@@ -847,7 +824,7 @@ export default function Home() {
         onPremiumRequest={openPremium}
       />
       <ProgrammingSection onPlay={playNow} onPremium={openPremium} />
-      <EntertainmentBand onSelectId={selectWatchById} />
+      <ReelsBand onSelectId={selectWatchById} />
       <InstitutionalBand />
       {premium && <PremiumPanel target={premium} onClose={() => setPremium(null)} />}
     </Layout>

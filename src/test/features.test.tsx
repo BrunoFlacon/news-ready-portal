@@ -38,7 +38,8 @@ describe("RadioPlayer — player global no cabeçalho", () => {
     renderWithProviders(<Home />);
 
     expect(screen.getByText("Em breve live")).toBeInTheDocument();
-    expect(screen.getByText("Domingo • 19h")).toBeInTheDocument();
+    // Tarja do banner + menu lateral da programação exibem o mesmo horário.
+    expect(screen.getAllByText("Domingo • 19h").length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: /Ouvir Agora/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Pausar/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId("radio-player-bar")).not.toBeInTheDocument();
@@ -406,23 +407,23 @@ describe("Home — player imersivo no banner gigante", () => {
     expect(screen.getByTestId("watch-next-card")).toBeInTheDocument();
     expect(screen.getByText(/Cultura em destaque/i)).toBeInTheDocument();
 
-    // Depois de 1s: anúncio da assinatura premium.
+    // Depois de 4s: anúncio da assinatura premium (rotação lenta).
     act(() => {
-      vi.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(4000);
     });
     expect(screen.getByTestId("watch-premium-ad")).toBeInTheDocument();
 
-    // Passado mais 1s: grade com a próxima live e o próximo programa.
+    // Passados mais 4s: grade com a próxima live e o próximo programa.
     act(() => {
-      vi.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(4000);
     });
     expect(screen.getByTestId("watch-schedule-ad")).toBeInTheDocument();
     expect(screen.getByText(/Próxima live/i)).toBeInTheDocument();
     expect(screen.getByText(/Domingo às 19h/i)).toBeInTheDocument();
 
-    // No 3º segundo o próximo da recomendação (story-3) começa sozinho.
+    // No 12º segundo o próximo da recomendação (story-3) começa sozinho.
     act(() => {
-      vi.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(4000);
     });
     expect(screen.getByTestId("watch-media")).toHaveAttribute(
       "src",
