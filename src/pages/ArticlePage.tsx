@@ -60,23 +60,24 @@ const ArticlePage = () => {
 
   return (
     <Layout>
-      <article className="container mx-auto px-4 py-8 max-w-3xl">
+      <article className="container max-w-4xl py-12 md:py-16">
         <span className="text-xs font-bold uppercase tracking-wider text-section-label">{article.category}</span>
-        <h1 className="font-serif font-bold text-2xl md:text-4xl leading-tight text-foreground mt-2 mb-4">{article.title}</h1>
+        <h1 className="mt-3 max-w-3xl font-serif text-3xl font-bold leading-tight text-foreground md:text-5xl">{article.title}</h1>
+        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted-foreground">{article.excerpt}</p>
 
-        <div className="flex items-center gap-3 text-sm text-muted-foreground mb-6">
+        <div className="mb-8 mt-6 flex flex-wrap items-center gap-3 border-y border-border py-4 text-sm text-muted-foreground">
           <span>Por <strong className="text-foreground">{article.author}</strong></span>
           <span>•</span>
           <time>{new Date(article.date).toLocaleDateString("pt-BR", { year: "numeric", month: "long", day: "numeric" })}</time>
         </div>
 
-        <div className="rounded-xl overflow-hidden mb-8 aspect-video">
+        <div className="mb-10 aspect-video overflow-hidden rounded-md border border-border">
           <img src={article.imageUrl} alt={article.title} className="w-full h-full object-cover" />
         </div>
 
-        <div className="prose prose-lg max-w-none text-foreground">
+        <div className="mx-auto max-w-2xl text-lg text-foreground">
           {article.body.split("\n\n").map((p, i) => (
-            <p key={i} className="mb-4 leading-relaxed">{p}</p>
+            <p key={i} className="mb-6 leading-8">{p}</p>
           ))}
         </div>
 

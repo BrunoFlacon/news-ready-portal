@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/Layout";
 import { NewsCard } from "@/components/NewsCard";
 import { articles, trendingTopics, type Article } from "@/data/articles";
@@ -14,7 +16,13 @@ function filterByCategory(list: Article[], category: Category): Article[] {
 }
 
 const Index = () => {
-  const [category, setCategory] = useState<Category>("Todas");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialCategory = categories.includes(searchParams.get("categoria") as Category) ? searchParams.get("categoria") as Category : "Todas";
+  const [category, setCategory] = useState<Category>(initialCategory);
+  const selectCategory = (value: Category) => {
+    setCategory(value);
+    value === "Todas" ? setSearchParams({}) : setSearchParams({ categoria: value });
+  };
 
   const filtered = useMemo(() => filterByCategory(articles, category), [category]);
   const hero = filtered[0];
@@ -23,39 +31,36 @@ const Index = () => {
   return (
     <Layout>
       {/* Category filter */}
-      <div className="bg-card border-b border-border sticky top-0 z-40 shadow-sm">
-        <div className="container mx-auto px-4 py-3 flex flex-wrap gap-2">
+      <div className="border-b border-border bg-card">
+        <div className="container flex flex-wrap gap-2 py-4">
           {categories.map((c) => (
-            <button
+            <Button
               key={c}
-              onClick={() => setCategory(c)}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
-                category === c
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground hover:bg-accent"
-              }`}
+              onClick={() => selectCategory(c)}
+              variant={category === c ? "default" : "ghost"}
+              size="sm"
             >
               {c}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
 
       {/* Hero */}
       {hero && (
-        <section className="container mx-auto px-4 py-6">
+        <section className="container py-8">
           <Link to={`/artigo/${hero.id}`} className="group block">
-            <div className="relative rounded-xl overflow-hidden aspect-[21/9] md:aspect-[3/1]">
+            <div className="relative aspect-[21/10] overflow-hidden rounded-md md:aspect-[3/1]">
               <img src={hero.imageUrl} alt={hero.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+              <div className="absolute inset-0 bg-media-overlay" />
               <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10">
                 <span className="inline-block bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider px-3 py-1 rounded mb-3">
                   {hero.category}
                 </span>
-                <h2 className="font-serif font-bold text-2xl md:text-4xl leading-tight text-white max-w-3xl">
+                <h2 className="max-w-3xl font-serif text-2xl font-bold leading-tight text-overlay-foreground md:text-4xl">
                   {hero.title}
                 </h2>
-                <p className="text-white/80 mt-2 max-w-2xl text-sm md:text-base">{hero.excerpt}</p>
+                <p className="mt-2 max-w-2xl text-sm text-overlay-muted md:text-base">{hero.excerpt}</p>
               </div>
             </div>
           </Link>
@@ -63,7 +68,7 @@ const Index = () => {
       )}
 
       {/* Content grid */}
-      <section className="container mx-auto px-4 pb-12">
+      <section className="container pb-16">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Articles */}
           <div className="flex-1">
@@ -89,7 +94,7 @@ const Index = () => {
 
           {/* Sidebar */}
           <aside className="lg:w-72 shrink-0 space-y-6">
-            <div className="bg-card rounded-lg border border-border p-5">
+            <div className="rounded-md border border-border bg-card p-5">
               <h3 className="font-serif font-bold text-lg mb-3 flex items-center gap-2">
                 <span className="w-1 h-5 bg-primary rounded-full inline-block" />
                 Em Alta
@@ -104,7 +109,7 @@ const Index = () => {
               </ul>
             </div>
 
-            <div className="bg-card rounded-lg border border-border p-5">
+            <div className="rounded-md border border-border bg-card p-5">
               <h3 className="font-serif font-bold text-lg mb-3 flex items-center gap-2">
                 <span className="w-1 h-5 bg-primary rounded-full inline-block" />
                 Recentes
