@@ -551,6 +551,31 @@ describe("Home — player imersivo no banner gigante", () => {
     ).toBeInTheDocument();
   });
 
+  it("mostra o botão central de play quando pausado e reproduce ao tocar nele", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
+      }),
+    );
+    const player = screen.getByTestId("youtube-player");
+    const centerPlay = screen.getByTestId("player-center-play");
+
+    // O vídeo inicia tocando (autoplay mockado) — botão oculto.
+    expect(centerPlay).toHaveClass("opacity-0");
+
+    // Pausar o vídeo (clique no player ou no play da barra) torna o botão visível.
+    fireEvent.click(player);
+    expect(centerPlay).not.toHaveClass("opacity-0");
+
+    // O botão central reproduz ao ser tocado.
+    fireEvent.click(centerPlay);
+    expect(screen.getByRole("button", { name: /Pausar vídeo/i })).toBeInTheDocument();
+    expect(centerPlay).toHaveClass("opacity-0");
+  });
+
   it("pausa e reproduz o vídeo pelo botão central do player (estilo YouTube)", () => {
     mockMedia();
     renderWithProviders(<Home />);
@@ -569,7 +594,7 @@ describe("Home — player imersivo no banner gigante", () => {
     expect(screen.getByRole("button", { name: /Pausar vídeo/i })).toBeInTheDocument();
   });
 
-  it("seleciona a velocidade de reprodução no menu e aplica na mídia", () => {
+  it("seleciona a velocidade de reprodução no menu de configurações e aplica na mídia", () => {
     mockMedia();
     renderWithProviders(<Home />);
 
@@ -580,17 +605,19 @@ describe("Home — player imersivo no banner gigante", () => {
     );
     const media = screen.getByTestId("watch-media") as HTMLVideoElement;
 
-    const speedButton = screen.getByRole("button", { name: /Velocidade de reprodução/i });
-    expect(speedButton).toHaveTextContent("1x");
-
-    fireEvent.click(speedButton);
-    expect(screen.getByTestId("speed-menu")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Configurações do vídeo/i }));
+    expect(screen.getByTestId("settings-menu")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: /Velocidade de reprodução/i }));
     fireEvent.click(screen.getByRole("menuitemradio", { name: /1\.25x/i }));
-    expect(screen.getByRole("button", { name: /Velocidade de reprodução/i })).toHaveTextContent("1.25x");
     expect(media.playbackRate).toBe(1.25);
+
+    // Reabre o menu e confere a opção marcada.
+    fireEvent.click(screen.getByRole("button", { name: /Configurações do vídeo/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Velocidade de reprodução/i }));
+    expect(screen.getByRole("menuitemradio", { name: /1\.25x/i })).toHaveAttribute("aria-checked", "true");
   });
 
-  it("abre o menu de qualidade (padrão Auto 1080p) e seleciona 480p", () => {
+  it("abre o menu de qualidade dentro das configurações (padrão Auto 1080p) e seleciona 480p", () => {
     mockMedia();
     renderWithProviders(<Home />);
 
@@ -599,13 +626,18 @@ describe("Home — player imersivo no banner gigante", () => {
         name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
       }),
     );
-    const qualityButton = screen.getByRole("button", { name: /Qualidade do vídeo/i });
-    expect(qualityButton).toHaveTextContent("Auto (1080p)");
 
-    fireEvent.click(qualityButton);
-    expect(screen.getByTestId("quality-menu")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Configurações do vídeo/i }));
+    expect(screen.getByRole("menuitem", { name: /Qualidade do vídeo/i })).toHaveTextContent("Auto (1080p)");
+    fireEvent.click(screen.getByRole("menuitem", { name: /Qualidade do vídeo/i }));
     fireEvent.click(screen.getByRole("menuitemradio", { name: /480p/i }));
-    expect(screen.getByRole("button", { name: /Qualidade do vídeo/i })).toHaveTextContent("480p");
+    expect(screen.queryByTestId("settings-menu")).not.toBeInTheDocument();
+
+    // Reabre e confere a qualidade escolhida no item e no submenu.
+    fireEvent.click(screen.getByRole("button", { name: /Configurações do vídeo/i }));
+    expect(screen.getByRole("menuitem", { name: /Qualidade do vídeo/i })).toHaveTextContent("480p");
+    fireEvent.click(screen.getByRole("menuitem", { name: /Qualidade do vídeo/i }));
+    expect(screen.getByRole("menuitemradio", { name: /480p/i })).toHaveAttribute("aria-checked", "true");
   });
 
   it("arrasta a timeline para buscar (scrub) e mostra a capa como pré-visualização", () => {
@@ -714,7 +746,7 @@ describe("Home — player imersivo no banner gigante", () => {
     expect(popover.className).not.toContain("sm:opacity-100");
   });
 
-  it("reúne teatro, mini player e tela cheia em um único botão de exibição", () => {
+  it("reúne teatro, mini player e tela cheia no menu de exibição das configurações", () => {
     mockMedia();
     renderWithProviders(<Home />);
 
@@ -725,15 +757,17 @@ describe("Home — player imersivo no banner gigante", () => {
     );
     const media = screen.getByTestId("watch-media") as HTMLVideoElement;
 
-    const viewButton = screen.getByRole("button", { name: /Exibição do vídeo/i });
-    fireEvent.click(viewButton);
-    expect(screen.getByTestId("view-menu")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Configurações do vídeo/i }));
+    expect(screen.getByTestId("settings-menu")).toBeInTheDocument();
+    const viewItem = screen.getByRole("menuitem", { name: /Exibição/i });
+    expect(viewItem).toBeInTheDocument();
+    fireEvent.click(viewItem);
     expect(screen.getByRole("menuitemradio", { name: /Teatro/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitemradio", { name: /Mini player/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitemradio", { name: /Tela cheia/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("menuitemradio", { name: /Teatro/i }));
-    expect(viewButton).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("settings-menu")).not.toBeInTheDocument();
     expect(media.className).toContain("object-contain");
   });
 });

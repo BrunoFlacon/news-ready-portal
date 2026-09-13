@@ -8,6 +8,10 @@ import {
 } from "react";
 import {
   Captions,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  EllipsisVertical,
   Gauge,
   Loader2,
   Maximize,
@@ -190,7 +194,7 @@ interface YouTubePlayerProps {
   onEnded: () => void;
 }
 
-type OpenMenu = "speed" | "quality" | "view" | null;
+type SettingsView = "root" | "quality" | "speed" | "view";
 
 export function YouTubePlayer({
   src,
@@ -220,7 +224,8 @@ export function YouTubePlayer({
   const [volume, setVolume] = useState(prefs.volume);
   const [volumeOpen, setVolumeOpen] = useState(false);
   const [speed, setSpeed] = useState(prefs.speed);
-  const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
+  const [openMenu, setOpenMenu] = useState<"settings" | null>(null);
+  const [settingsView, setSettingsView] = useState<SettingsView>("root");
   const [quality, setQuality] = useState<WatchQuality>(prefs.quality);
   const [activeQuality, setActiveQuality] = useState<WatchQuality>(
     prefs.quality === "auto" ? resolveAutoQuality() : prefs.quality,
@@ -348,6 +353,7 @@ export function YouTubePlayer({
   // Clique no player (fora dos controles): fecha menus e dá play/pause.
   const handlePlayerClick = useCallback(() => {
     setOpenMenu(null);
+    setSettingsView("root");
     setVolumeOpen(false);
     togglePlay();
   }, [togglePlay]);
@@ -394,8 +400,14 @@ export function YouTubePlayer({
     }
   }, []);
 
-  const toggleMenu = (menu: Exclude<OpenMenu, null>) => {
-    setOpenMenu((current) => (current === menu ? null : menu));
+  const openSettings = () => {
+    setOpenMenu((current) => {
+      if (current === "settings") {
+        return null;
+      }
+      setSettingsView("root");
+      return "settings";
+    });
     setVolumeOpen(false);
   };
 
@@ -403,6 +415,7 @@ export function YouTubePlayer({
     setQuality(level);
     setActiveQuality(level === "auto" ? resolveAutoQuality() : level);
     setOpenMenu(null);
+    setSettingsView("root");
   };
 
   const startScrubbing = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -413,6 +426,7 @@ export function YouTubePlayer({
     scrubbingWasPausedRef.current = video.paused;
     setScrubbing(true);
     setOpenMenu(null);
+    setSettingsView("root");
     setVolumeOpen(false);
     video.pause();
     handlePreview(event.clientX);
@@ -464,6 +478,7 @@ export function YouTubePlayer({
       }
       if (event.key === "Escape") {
         setOpenMenu(null);
+        setSettingsView("root");
         setVolumeOpen(false);
         return;
       }
@@ -520,6 +535,7 @@ export function YouTubePlayer({
   const controlsVisible = showControls || paused;
   const qualityLabel =
     quality === "auto" ? `Auto (${QUALITY_LABELS[activeQuality]})` : QUALITY_LABELS[quality];
+  const volumePercent = muted ? 0 : Math.round(volume * 100);
 
   const viewActions: Array<{
     key: string;
@@ -544,6 +560,20 @@ export function YouTubePlayer({
     },
     { key: "fullscreen", label: "Tela cheia", icon: Maximize, active: fullscreen, run: toggleFullscreen },
   ];
+
+  const activeViewLabel = theater
+    ? "Teatro"
+    : miniPlayer
+      ? "Mini player"
+      : fullscreen
+        ? "Tela cheia"
+        : "Padrão";
+
+  const menuItemClasses = (active: boolean) =>
+    cn(
+      "flex w-full items-center justify-between gap-2 rounded-sm px-3 py-1.5 text-left text-xs",
+      active ? "bg-brand font-bold text-brand-foreground" : "text-foreground hover:bg-secondary",
+    );
 
   return (
     <div
@@ -612,6 +642,30 @@ export function YouTubePlayer({
         </span>
       )}
 
+      {/*
+        Botão central de play, no estilo do play da capa:
+        fica sempre visível quando pausado e aparece no hover/toque enquanto toca.
+      */}
+      <button
+        type="button"
+        data-testid="player-center-play"
+        aria-label="Reproduzir conteúdo"
+        onClick={(event) => {
+          event.stopPropagation();
+          togglePlay();
+        }}
+        className={cn(
+          "absolute inset-0 z-[2] flex items-center justify-center transition-opacity duration-200",
+          paused
+            ? "opacity-100"
+            : "pointer-events-none opacity-0 group-hover/player:pointer-events-auto group-hover/player:opacity-100",
+        )}
+      >
+        <span className="flex h-20 w-20 items-center justify-center rounded-full bg-brand/95 text-brand-foreground shadow-2xl ring-4 ring-white/25 transition-transform duration-200 group-hover:scale-110 md:h-24 md:w-24">
+          <Play className="h-9 w-9 translate-x-0.5 fill-current md:h-10 md:w-10" />
+        </span>
+      </button>
+
       {/* Legenda (CC) sobre o vídeo — sem tarja preta, só sombra para contraste */}
       {cc && (
         <div
@@ -664,7 +718,7 @@ export function YouTubePlayer({
           </div>
         </div>
 
-        {/* Linha de controles */}
+        {/* Linha de controles: play, tempo, volume (vertical), legendas e configurações (⋮) */}
         <div className="relative z-[1] flex items-center gap-0.5 px-2 pb-2 text-white">
           <ControlButton
             label={paused ? "Reproduzir vídeo" : "Pausar vídeo"}
@@ -680,7 +734,7 @@ export function YouTubePlayer({
 
           <div className="flex-1" />
 
-          {/* Volume: alto-falante + campo que abre para cima no hover/toque e some depois de usar */}
+          {/* Volume: alto-falante + barra vertical que abre para cima no hover/toque */}
           <div className="group/vol relative flex items-center">
             <ControlButton
               label={muted ? "Ativar som do vídeo" : "Silenciar vídeo"}
@@ -699,24 +753,28 @@ export function YouTubePlayer({
             <div
               data-testid="volume-popover"
               className={cn(
-                "absolute bottom-full right-0 mb-2 flex items-center gap-2 rounded-md bg-neutral-900/95 px-3 py-2 shadow-xl",
+                "absolute bottom-full right-0 mb-2 flex flex-col items-center gap-1.5 rounded-md bg-neutral-900/95 px-2 py-2 shadow-xl",
                 "sm:pointer-events-none sm:opacity-0 sm:transition-all sm:duration-150 sm:group-hover/vol:pointer-events-auto sm:group-hover/vol:opacity-100",
                 volumeOpen && "sm:pointer-events-auto sm:opacity-100",
                 "max-sm:static max-sm:mb-0 max-sm:rounded-none max-sm:bg-transparent max-sm:px-0 max-sm:py-0 max-sm:shadow-none",
               )}
             >
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={muted ? 0 : volume}
-                onChange={onVolumeInput}
-                aria-label="Volume do vídeo"
-                className="h-1.5 w-24 cursor-pointer accent-live lg:w-32"
-              />
-              <span className="w-9 text-right text-[10px] font-bold tabular-nums text-white">
-                {muted ? 0 : Math.round(volume * 100)}%
+              {/* Barra de volume na VERTICAL (gira o input; o TAG/valor sobe com o arraste) */}
+              <span className="relative block h-20 w-6">
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={muted ? 0 : volume}
+                  onChange={onVolumeInput}
+                  aria-valuetext={`${volumePercent}%`}
+                  aria-label="Volume do vídeo"
+                  className="absolute left-1/2 top-1/2 h-1.5 w-20 -translate-x-1/2 -translate-y-1/2 rotate-[-90deg] cursor-pointer accent-live"
+                />
+              </span>
+              <span className="w-8 text-center text-[10px] font-bold tabular-nums text-white">
+                {volumePercent}%
               </span>
             </div>
           </div>
@@ -731,140 +789,172 @@ export function YouTubePlayer({
             <Captions className="h-5 w-5" />
           </ControlButton>
 
-          {/* Velocidade de reprodução (menu para cima) */}
-          <div className="relative">
-            <ControlButton
-              label="Velocidade de reprodução"
-              tooltip="Velocidade de reprodução"
-              hasMenu
-              expanded={openMenu === "speed"}
-              onClick={() => toggleMenu("speed")}
-              className="w-auto px-2"
-            >
-              <span className="text-xs font-bold">{speed}x</span>
-            </ControlButton>
-            {openMenu === "speed" && (
-              <div
-                role="menu"
-                data-testid="speed-menu"
-                className="absolute bottom-10 right-0 z-30 w-36 overflow-hidden rounded-md border border-border bg-background p-1 shadow-2xl"
-              >
-                <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Velocidade
-                </p>
-                {SPEED_STEPS.map((step) => (
-                  <button
-                    key={step}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={speed === step}
-                    onClick={() => {
-                      setSpeed(step);
-                      setOpenMenu(null);
-                    }}
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-sm px-3 py-1.5 text-left text-xs",
-                      speed === step
-                        ? "bg-brand font-bold text-brand-foreground"
-                        : "text-foreground hover:bg-secondary",
-                    )}
-                  >
-                    {step}x
-                    {step === 1 && <span className="text-[10px] opacity-70">Normal</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Configurações (⋮): qualidade, velocidade e exibição em um só botão */}
+          <ControlButton
+            label="Configurações do vídeo"
+            tooltip="Qualidade, velocidade e exibição"
+            hasMenu
+            expanded={openMenu === "settings"}
+            onClick={openSettings}
+          >
+            <EllipsisVertical className="h-5 w-5" />
+          </ControlButton>
 
-          {/* Qualidade (menu para cima; padrão Auto — 1080p em conexões boas) */}
-          <div className="relative">
-            <ControlButton
-              label="Qualidade do vídeo"
-              tooltip="Qualidade do vídeo"
-              hasMenu
-              expanded={openMenu === "quality"}
-              onClick={() => toggleMenu("quality")}
-              className="w-auto gap-1 px-2"
+          {openMenu === "settings" && (
+            <div
+              role="menu"
+              data-testid="settings-menu"
+              className="absolute bottom-10 right-2 z-30 w-60 overflow-hidden rounded-md border border-border bg-background p-1 shadow-2xl"
             >
-              <Gauge className="h-4 w-4" />
-              <span className="text-[10px] font-bold">{qualityLabel}</span>
-            </ControlButton>
-            {openMenu === "quality" && (
-              <div
-                role="menu"
-                data-testid="quality-menu"
-                className="absolute bottom-10 right-0 z-30 w-44 overflow-hidden rounded-md border border-border bg-background p-1 shadow-2xl"
-              >
-                <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Qualidade
-                </p>
-                {QUALITY_LEVELS.map((level) => (
+              {settingsView === "root" && (
+                <>
+                  <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    Configurações
+                  </p>
                   <button
-                    key={level}
                     type="button"
-                    role="menuitemradio"
-                    aria-checked={quality === level}
-                    onClick={() => selectQuality(level)}
-                    className={cn(
-                      "flex w-full items-center justify-between gap-2 rounded-sm px-3 py-1.5 text-left text-xs",
-                      quality === level
-                        ? "bg-brand font-bold text-brand-foreground"
-                        : "text-foreground hover:bg-secondary",
-                    )}
+                    role="menuitem"
+                    onClick={() => setSettingsView("quality")}
+                    className="flex w-full items-center justify-between gap-2 rounded-sm px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
                   >
-                    {QUALITY_LABELS[level]}
-                    {level === "auto" && <span className="text-[10px] opacity-70">automático</span>}
+                    <span className="flex items-center gap-2">
+                      <Gauge className="h-4 w-4" />
+                      Qualidade do vídeo
+                    </span>
+                    <span className="flex items-center gap-1 text-[10px] opacity-70">
+                      {qualityLabel}
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </span>
                   </button>
-                ))}
-              </div>
-            )}
-          </div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => setSettingsView("speed")}
+                    className="flex w-full items-center justify-between gap-2 rounded-sm px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Play className="h-3.5 w-3.5 opacity-70" />
+                      Velocidade de reprodução
+                    </span>
+                    <span className="flex items-center gap-1 text-[10px] opacity-70">
+                      {speed}x
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => setSettingsView("view")}
+                    className="flex w-full items-center justify-between gap-2 rounded-sm px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
+                  >
+                    <span className="flex items-center gap-2">
+                      <RectangleHorizontal className="h-4 w-4" />
+                      Exibição
+                    </span>
+                    <span className="flex items-center gap-1 text-[10px] opacity-70">
+                      {activeViewLabel}
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </span>
+                  </button>
+                </>
+              )}
 
-          {/* Exibição: teatro, mini player e tela cheia em um só botão (menu para cima) */}
-          <div className="relative">
-            <ControlButton
-              label="Exibição do vídeo"
-              tooltip="Tamanho da tela"
-              hasMenu
-              expanded={openMenu === "view"}
-              onClick={() => toggleMenu("view")}
-            >
-              <RectangleHorizontal className="h-5 w-5" />
-            </ControlButton>
-            {openMenu === "view" && (
-              <div
-                role="menu"
-                data-testid="view-menu"
-                className="absolute bottom-10 right-0 z-30 w-44 overflow-hidden rounded-md border border-border bg-background p-1 shadow-2xl"
-              >
-                <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Exibição
-                </p>
-                {viewActions.map((action) => (
+              {settingsView === "quality" && (
+                <>
                   <button
-                    key={action.key}
                     type="button"
-                    role="menuitemradio"
-                    aria-checked={action.active}
-                    onClick={() => {
-                      action.run();
-                      setOpenMenu(null);
-                    }}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-sm px-3 py-1.5 text-left text-xs",
-                      action.active
-                        ? "bg-brand font-bold text-brand-foreground"
-                        : "text-foreground hover:bg-secondary",
-                    )}
+                    role="menuitem"
+                    onClick={() => setSettingsView("root")}
+                    className="flex w-full items-center gap-1 rounded-sm px-2 py-1.5 text-left text-xs font-bold text-foreground hover:bg-secondary"
                   >
-                    <action.icon className="h-4 w-4" />
-                    {action.label}
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    Qualidade
                   </button>
-                ))}
-              </div>
-            )}
-          </div>
+                  {QUALITY_LEVELS.map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={quality === level}
+                      onClick={() => selectQuality(level)}
+                      className={menuItemClasses(quality === level)}
+                    >
+                      <span className="flex items-center gap-2">{QUALITY_LABELS[level]}</span>
+                      {quality === level && <Check className="h-3.5 w-3.5" />}
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {settingsView === "speed" && (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => setSettingsView("root")}
+                    className="flex w-full items-center gap-1 rounded-sm px-2 py-1.5 text-left text-xs font-bold text-foreground hover:bg-secondary"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    Velocidade
+                  </button>
+                  {SPEED_STEPS.map((step) => (
+                    <button
+                      key={step}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={speed === step}
+                      onClick={() => {
+                        setSpeed(step);
+                        setOpenMenu(null);
+                        setSettingsView("root");
+                      }}
+                      className={menuItemClasses(speed === step)}
+                    >
+                      <span className="flex items-center gap-2">
+                        {step}x
+                        {step === 1 && <span className="text-[10px] opacity-60">Normal</span>}
+                      </span>
+                      {speed === step && <Check className="h-3.5 w-3.5" />}
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {settingsView === "view" && (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => setSettingsView("root")}
+                    className="flex w-full items-center gap-1 rounded-sm px-2 py-1.5 text-left text-xs font-bold text-foreground hover:bg-secondary"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    Exibição
+                  </button>
+                  {viewActions.map((action) => (
+                    <button
+                      key={action.key}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={action.active}
+                      onClick={() => {
+                        action.run();
+                        setOpenMenu(null);
+                        setSettingsView("root");
+                      }}
+                      className={menuItemClasses(action.active)}
+                    >
+                      <span className="flex items-center gap-2">
+                        <action.icon className="h-4 w-4" />
+                        {action.label}
+                      </span>
+                      {action.active && <Check className="h-3.5 w-3.5" />}
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
