@@ -17,6 +17,14 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// No GitHub Pages o site vive em /news-ready-portal/; o react-router precisa
+// do basename correspondente para resolver as rotas. Em produção local e no
+// preview do Lovable a base é "/" (sem subpath).
+const basename =
+  import.meta.env.BASE_URL && import.meta.env.BASE_URL !== "/"
+    ? import.meta.env.BASE_URL.replace(/\/+$/, "")
+    : undefined;
+
 /**
  * Gerencia o scroll entre rotas: âncoras (#institucional) são alcançadas com
  * scroll suave e qualquer outra navegação rola para o topo.
@@ -65,7 +73,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <RadioPlayerProvider>
-            <BrowserRouter>
+            <BrowserRouter basename={basename}>
               <AppRoutes />
             </BrowserRouter>
           </RadioPlayerProvider>
