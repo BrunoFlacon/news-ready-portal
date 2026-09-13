@@ -8,8 +8,10 @@
  *
  * Regras de convivência:
  *  - tocar um podcast pausa automaticamente a transmissão ao vivo;
- *  - a barra inferior pode ser minimizada em um card flutuante (canto
- *    esquerdo) que não atrapalha a leitura em nenhuma página;
+ *  - o elemento <audio> do conteúdo atual vive no provedor (nunca é
+ *    desmontado ao minimizar a barra), então a reprodução continua de onde
+ *    parou inclusive no card flutuante;
+ *  - o estado play/pause é sincronizado pelos eventos reais da mídia;
  *  - ao terminar um podcast, um painel de sugestões é exibido; se nada for
  *    escolhido em 3 segundos, um vídeo/reel/story "breaking" recomendado
  *    começa a tocar automaticamente em um card flutuante.
@@ -18,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  Gauge,
   Headphones,
   Maximize2,
   Minimize2,
@@ -27,6 +30,8 @@ import {
   SkipBack,
   SkipForward,
   Video,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -50,6 +55,9 @@ export interface NowPlaying {
   images?: string[];
 }
 
+const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 1.75, 2];
+const SEEK_STEP_SECONDS = 15;
+
 export interface RadioPlayerApi {
   streamUrl: string;
   liveOpen: boolean;
@@ -61,6 +69,11 @@ export interface RadioPlayerApi {
   suggestionsOpen: boolean;
   queue: Podcast[];
   queueIndex: number;
+  currentTime: number;
+  duration: number;
+  volume: number;
+  muted: boolean;
+  playbackRate: number;
   openPlayer: () => void;
   closePlayer: () => void;
   toggleLivePlay: () => void;
@@ -69,6 +82,12 @@ export interface RadioPlayerApi {
   playNext: () => void;
   playPrevious: () => void;
   togglePlayback: () => void;
+  seekTo: (seconds: number) => void;
+  seekBackward: () => void;
+  seekForward: () => void;
+  toggleMute: () => void;
+  changeVolume: (volume: number) => void;
+  cyclePlaybackRate: () => void;
   minimize: () => void;
   expand: () => void;
   closeNowPlaying: () => void;
@@ -95,6 +114,12 @@ export function useRadioPlayer(): RadioPlayerApi {
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [queue, setQueue] = useState<Podcast[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
+
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [muted, setMuted] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
 
   const openPlayer = useCallback(() => {
     if (!streamUrl) {
@@ -165,6 +190,48 @@ export function useRadioPlayer(): RadioPlayerApi {
     };
   }, [liveOpen]);
 
+  // Sincroniza o estado play/pause, o progresso e o fim do conteúdo atual
+  // (podcast ou slideshow de vídeo) com os eventos reais da mídia.
+  useEffect(() => {
+    const audio = npAudioRef.current;
+    if (!audio) {
+      return;
+    }
+    const onPlay = () => setPlaybackPlaying(true);
+    const onPause = () => setPlaybackPlaying(false);
+    const onTimeUpdate = () => setCurrentTime(audio.currentTime || 0);
+    const onLoadedMetadata = () => setDuration(audio.duration || 0);
+    const onEnded = () => {
+      setPlaybackPlaying(false);
+      setMinimized(false);
+      setSuggestionsOpen(true);
+    };
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("loadedmetadata", onLoadedMetadata);
+    audio.addEventListener("ended", onEnded);
+    return () => {
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("loadedmetadata", onLoadedMetadata);
+      audio.removeEventListener("ended", onEnded);
+    };
+  }, [nowPlaying?.kind, nowPlaying?.id]);
+
+  // Sincroniza volume, mudo e velocidade em todo meio ativo.
+  useEffect(() => {
+    for (const media of [npAudioRef.current, videoRef.current]) {
+      if (!media) {
+        continue;
+      }
+      media.volume = volume;
+      media.muted = muted;
+      media.playbackRate = playbackRate;
+    }
+  }, [volume, muted, playbackRate]);
+
   const playPodcast = useCallback((podcast: Podcast, list?: Podcast[]) => {
     liveAudioRef.current?.pause();
     videoRef.current?.pause();
@@ -223,9 +290,15 @@ export function useRadioPlayer(): RadioPlayerApi {
     playPodcast(queue[(queueIndex - 1 + queue.length) % queue.length], queue);
   }, [queue, queueIndex, playPodcast]);
 
+  const currentMedia = useCallback(() => {
+    if (nowPlaying?.kind === "video" && nowPlaying.videoUrl) {
+      return videoRef.current;
+    }
+    return npAudioRef.current;
+  }, [nowPlaying]);
+
   const togglePlayback = useCallback(() => {
-    const media =
-      nowPlaying?.kind === "video" ? videoRef.current : npAudioRef.current;
+    const media = currentMedia();
     if (!media) {
       return;
     }
@@ -236,10 +309,58 @@ export function useRadioPlayer(): RadioPlayerApi {
         // Reprodução rejeitada sem gesto válido; o usuário pode clicar de novo.
       });
     }
-  }, [nowPlaying, playbackPlaying]);
+  }, [currentMedia, playbackPlaying]);
 
-  // Percorre as imagens do item quando é um visual sem vídeo real.
-  const handleNowPlayingEnded = useCallback(() => {
+  const seekTo = useCallback(
+    (seconds: number) => {
+      const media = currentMedia();
+      if (!media) {
+        return;
+      }
+      media.currentTime = Math.max(
+        0,
+        Math.min(seconds, media.duration || seconds),
+      );
+      setCurrentTime(media.currentTime || 0);
+    },
+    [currentMedia],
+  );
+
+  const seekBackward = useCallback(() => {
+    const media = currentMedia();
+    if (!media) {
+      return;
+    }
+    media.currentTime = Math.max(0, media.currentTime - SEEK_STEP_SECONDS);
+    setCurrentTime(media.currentTime || 0);
+  }, [currentMedia]);
+
+  const seekForward = useCallback(() => {
+    const media = currentMedia();
+    if (!media) {
+      return;
+    }
+    media.currentTime = Math.min(
+      media.currentTime + SEEK_STEP_SECONDS,
+      media.duration || media.currentTime + SEEK_STEP_SECONDS,
+    );
+    setCurrentTime(media.currentTime || 0);
+  }, [currentMedia]);
+
+  const toggleMute = useCallback(() => setMuted((value) => !value), []);
+  const changeVolume = useCallback(
+    (value: number) => setVolume(Math.max(0, Math.min(1, value))),
+    [],
+  );
+
+  const cyclePlaybackRate = useCallback(() => {
+    setPlaybackRate((rate) => {
+      const next = PLAYBACK_RATES[(PLAYBACK_RATES.indexOf(rate) + 1) % PLAYBACK_RATES.length];
+      return next;
+    });
+  }, []);
+
+  const handleMediaEnded = useCallback(() => {
     setPlaybackPlaying(false);
     setMinimized(false);
     setSuggestionsOpen(true);
@@ -266,10 +387,7 @@ export function useRadioPlayer(): RadioPlayerApi {
       npAudioRef.current?.play().catch(() => setPlaybackPlaying(false));
     }
     if (nowPlaying.kind === "video" && nowPlaying.videoUrl) {
-      const video = videoRef.current;
-      if (video) {
-        video.play().catch(() => setPlaybackPlaying(false));
-      }
+      videoRef.current?.play().catch(() => setPlaybackPlaying(false));
     }
     if (nowPlaying.kind === "video" && !nowPlaying.videoUrl && nowPlaying.audioUrl) {
       npAudioRef.current?.play().catch(() => setPlaybackPlaying(false));
@@ -286,6 +404,8 @@ export function useRadioPlayer(): RadioPlayerApi {
     setPlaybackPlaying(false);
     setSuggestionsOpen(false);
     setMinimized(false);
+    setCurrentTime(0);
+    setDuration(0);
   }, []);
   const dismissSuggestions = useCallback(() => setSuggestionsOpen(false), []);
 
@@ -300,6 +420,11 @@ export function useRadioPlayer(): RadioPlayerApi {
     suggestionsOpen,
     queue,
     queueIndex,
+    currentTime,
+    duration,
+    volume,
+    muted,
+    playbackRate,
     openPlayer,
     closePlayer,
     toggleLivePlay,
@@ -308,11 +433,17 @@ export function useRadioPlayer(): RadioPlayerApi {
     playNext,
     playPrevious,
     togglePlayback,
+    seekTo,
+    seekBackward,
+    seekForward,
+    toggleMute,
+    changeVolume,
+    cyclePlaybackRate,
     minimize,
     expand,
     closeNowPlaying,
     dismissSuggestions,
-    handleMediaEnded: handleNowPlayingEnded,
+    handleMediaEnded,
     liveAudioRef,
     npAudioRef,
     videoRef,
@@ -404,8 +535,17 @@ export function RadioPlayerBar({
 interface NowPlayingBarProps {
   nowPlaying: NowPlaying;
   playing: boolean;
-  audioRef: React.RefObject<HTMLAudioElement>;
-  onEnded: () => void;
+  currentTime: number;
+  duration: number;
+  volume: number;
+  muted: boolean;
+  playbackRate: number;
+  onSeekTo: (seconds: number) => void;
+  onSeekBackward: () => void;
+  onSeekForward: () => void;
+  onToggleMute: () => void;
+  onVolumeChange: (volume: number) => void;
+  onCycleRate: () => void;
   hasQueue: boolean;
   onPrevious?: () => void;
   onNext?: () => void;
@@ -418,8 +558,17 @@ interface NowPlayingBarProps {
 export function NowPlayingBar({
   nowPlaying,
   playing,
-  audioRef,
-  onEnded,
+  currentTime,
+  duration,
+  volume,
+  muted,
+  playbackRate,
+  onSeekTo,
+  onSeekBackward,
+  onSeekForward,
+  onToggleMute,
+  onVolumeChange,
+  onCycleRate,
   hasQueue,
   onPrevious,
   onNext,
@@ -427,33 +576,11 @@ export function NowPlayingBar({
   onMinimize,
   onClose,
 }: NowPlayingBarProps) {
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-
-  const seek = (value: number) => {
-    const audio = audioRef.current;
-    if (!audio) {
-      return;
-    }
-    audio.currentTime = value;
-    setCurrentTime(value);
-  };
-
   return (
     <div
       data-testid="now-playing-bar"
       className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-card/95 shadow-2xl backdrop-blur-md"
     >
-      <audio
-        ref={audioRef}
-        src={nowPlaying.audioUrl}
-        autoPlay
-        onEnded={onEnded}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
-        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-        onPlay={() => undefined}
-        onPause={() => undefined}
-      />
       <div className="container flex items-center gap-3 px-4 py-3 sm:gap-4">
         <img
           src={nowPlaying.imageUrl}
@@ -474,7 +601,7 @@ export function NowPlayingBar({
               max={duration || 100}
               step={1}
               value={Math.min(currentTime, duration || 100)}
-              onChange={(e) => seek(Number(e.target.value))}
+              onChange={(e) => onSeekTo(Number(e.target.value))}
               className="range-brand h-1 w-full"
             />
             <span className="text-[10px] tabular-nums text-muted-foreground">
@@ -483,13 +610,22 @@ export function NowPlayingBar({
           </div>
         </div>
         <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
+          <button
+            type="button"
+            onClick={onSeekBackward}
+            aria-label="Voltar 15 segundos"
+            title="Voltar 15 segundos"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground sm:h-9 sm:w-9"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
           {hasQueue && (
             <>
               <button
                 type="button"
                 onClick={onPrevious}
                 aria-label="Episódio anterior"
-                className="hidden h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground sm:flex"
+                className="hidden h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground md:flex"
               >
                 <SkipBack className="h-4 w-4 fill-current" />
               </button>
@@ -497,7 +633,7 @@ export function NowPlayingBar({
                 type="button"
                 onClick={onNext}
                 aria-label="Próximo episódio"
-                className="hidden h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground sm:flex"
+                className="hidden h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground md:flex"
               >
                 <SkipForward className="h-4 w-4 fill-current" />
               </button>
@@ -511,6 +647,49 @@ export function NowPlayingBar({
             className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-colors hover:bg-accent"
           >
             {playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 translate-x-0.5 fill-current" />}
+          </button>
+          <button
+            type="button"
+            onClick={onSeekForward}
+            aria-label="Avançar 15 segundos"
+            title="Avançar 15 segundos"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground sm:h-9 sm:w-9"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onToggleMute}
+            aria-label={muted ? "Ativar som" : "Silenciar"}
+            aria-pressed={muted}
+            title={muted ? "Ativar som" : "Silenciar"}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {muted || volume === 0 ? (
+              <VolumeX className="h-4 w-4" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
+          </button>
+          <input
+            type="range"
+            aria-label="Volume"
+            min={0}
+            max={100}
+            step={1}
+            value={Math.round(volume * 100)}
+            onChange={(e) => onVolumeChange(Number(e.target.value) / 100)}
+            className="range-brand hidden h-1 w-16 sm:block"
+          />
+          <button
+            type="button"
+            onClick={onCycleRate}
+            aria-label="Velocidade de reprodução"
+            title="Velocidade de reprodução"
+            className="flex h-9 items-center gap-1 rounded-full bg-secondary px-2.5 text-[11px] font-bold text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Gauge className="h-4 w-4" />
+            {playbackRate}×
           </button>
           <button
             type="button"
@@ -671,14 +850,32 @@ export function SuggestionsPanel({ podcastTitle, onPlayPodcast, onPlayVisual, on
 
 interface VideoBubbleProps {
   nowPlaying: NowPlaying;
+  muted: boolean;
+  playbackRate: number;
   audioRef: React.RefObject<HTMLAudioElement>;
   videoRef: React.RefObject<HTMLVideoElement>;
   onEnded: () => void;
+  onToggleMute: () => void;
+  onCycleRate: () => void;
+  onSeekBackward: () => void;
+  onSeekForward: () => void;
   onClose: () => void;
 }
 
 /** Mini-player flutuante de vídeo/reel/story (canto inferior direito). */
-export function VideoBubble({ nowPlaying, audioRef, videoRef, onEnded, onClose }: VideoBubbleProps) {
+export function VideoBubble({
+  nowPlaying,
+  muted,
+  playbackRate,
+  audioRef,
+  videoRef,
+  onEnded,
+  onToggleMute,
+  onCycleRate,
+  onSeekBackward,
+  onSeekForward,
+  onClose,
+}: VideoBubbleProps) {
   const [imageIndex, setImageIndex] = useState(0);
   const images = nowPlaying.images && nowPlaying.images.length > 0 ? nowPlaying.images : [nowPlaying.imageUrl];
 
@@ -733,14 +930,47 @@ export function VideoBubble({ nowPlaying, audioRef, videoRef, onEnded, onClose }
           </>
         )}
       </div>
-      <div className="flex items-center gap-3 p-3">
+      <div className="flex items-center gap-2 p-3">
         <Headphones className="h-4 w-4 flex-shrink-0 text-brand" />
         <p className="min-w-0 flex-1 truncate text-xs font-bold text-foreground">{nowPlaying.title}</p>
         <button
           type="button"
+          onClick={onSeekBackward}
+          aria-label="Voltar 15 segundos"
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={onSeekForward}
+          aria-label="Avançar 15 segundos"
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={onToggleMute}
+          aria-label={muted ? "Ativar som" : "Silenciar"}
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground"
+        >
+          {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+        </button>
+        <button
+          type="button"
+          onClick={onCycleRate}
+          aria-label="Velocidade de reprodução"
+          className="flex h-7 items-center gap-0.5 rounded-full bg-secondary px-2 text-[10px] font-bold text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Gauge className="h-3 w-3" />
+          {playbackRate}×
+        </button>
+        <button
+          type="button"
           onClick={onClose}
           aria-label="Fechar vídeo"
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground"
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -782,6 +1012,3 @@ export function ListenNowButton({ streamUrl, onOpen }: ListenNowButtonProps) {
     </button>
   );
 }
-
-// Re-export usado pelos testes para localizar o feed de sugestões em ação.
-export const suggestionsRecommendationDelayMs = 3000;

@@ -33,12 +33,14 @@ afterEach(() => {
 });
 
 describe("RadioPlayer — player global no cabeçalho", () => {
-  it("sem VITE_RADIO_STREAM_URL exibe 'Em breve' desabilitado e não abre o player", () => {
+  it("sem VITE_RADIO_STREAM_URL mostra 'Em breve live' com o horário e não expõe botão de tocar", () => {
     vi.stubEnv("VITE_RADIO_STREAM_URL", "");
     renderWithProviders(<Home />);
 
-    const emBreve = screen.getAllByRole("button", { name: /Em breve/i })[0];
-    expect(emBreve).toBeDisabled();
+    expect(screen.getByText("Em breve live")).toBeInTheDocument();
+    expect(screen.getByText("Domingo, às 19h")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Ouvir Agora/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Pausar/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId("radio-player-bar")).not.toBeInTheDocument();
   });
 
@@ -175,7 +177,8 @@ describe("Podcast — barra estilo Spotify pausa a transmissão ao vivo", () => 
     expect(screen.queryByTestId("radio-player-bar")).not.toBeInTheDocument();
     const npBar = screen.getByTestId("now-playing-bar");
     expect(npBar).toBeInTheDocument();
-    expect(npBar.querySelector("audio")).toHaveAttribute(
+    // O <audio> do episódio vive no provider (fora da barra) e segue montado.
+    expect(screen.getByTestId("np-audio")).toHaveAttribute(
       "src",
       podcasts[0].audioUrl,
     );
@@ -206,10 +209,8 @@ describe("Podcast — barra estilo Spotify pausa a transmissão ao vivo", () => 
       screen.getAllByRole("button", { name: /Reproduzir podcast/i })[0],
     );
 
-    // Simula o fim do áudio do episódio.
-    const audio = screen
-      .getByTestId("now-playing-bar")
-      .querySelector("audio") as HTMLAudioElement;
+    // Simula o fim do áudio do episódio (o elemento permanente do provider).
+    const audio = screen.getByTestId("np-audio") as HTMLAudioElement;
     fireEvent(audio, new Event("ended"));
 
     expect(screen.getByTestId("suggestions-panel")).toBeInTheDocument();
@@ -229,9 +230,7 @@ describe("Podcast — barra estilo Spotify pausa a transmissão ao vivo", () => 
     fireEvent.click(
       screen.getAllByRole("button", { name: /Reproduzir podcast/i })[0],
     );
-    const audio = screen
-      .getByTestId("now-playing-bar")
-      .querySelector("audio") as HTMLAudioElement;
+    const audio = screen.getByTestId("np-audio") as HTMLAudioElement;
     fireEvent(audio, new Event("ended"));
 
     const suggest = screen.getByTestId("suggestions-panel");
@@ -243,6 +242,112 @@ describe("Podcast — barra estilo Spotify pausa a transmissão ao vivo", () => 
 
     expect(screen.queryByTestId("suggestions-panel")).not.toBeInTheDocument();
     expect(screen.getByTestId("video-bubble")).toBeInTheDocument();
+  });
+});
+
+describe("Podcast — controles da barra inferior", () => {
+  it("minimizar mantém o <audio> montado sem pausar a reprodução", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Reproduzir podcast/i })[0],
+    );
+    const audio = screen.getByTestId("np-audio") as HTMLAudioElement;
+    const pauseSpy = vi.spyOn(audio, "pause");
+
+    fireEvent.click(screen.getByRole("button", { name: /Minimizar player/i }));
+
+    expect(screen.queryByTestId("now-playing-bar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("floating-player")).toBeInTheDocument();
+    // O <audio> segue vivo (provider) e a minimização não o pausou.
+    expect(screen.getByTestId("np-audio")).toBeInTheDocument();
+    expect(pauseSpy).not.toHaveBeenCalled();
+  });
+
+  it("pausa e retoma sincronizados com os eventos reais play/pause", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Reproduzir podcast/i })[0],
+    );
+
+    const audio = screen.getByTestId("np-audio") as HTMLAudioElement;
+    const playSpy = vi.spyOn(audio, "play").mockResolvedValue(undefined);
+    const pauseSpy = vi.spyOn(audio, "pause").mockImplementation(() => {
+      fireEvent(audio, new Event("pause"));
+    });
+
+    // Pausa: o botão reflete o evento "pause" da mídia e não fica travado.
+    fireEvent.click(screen.getByRole("button", { name: /Pausar podcast/i }));
+    expect(pauseSpy).toHaveBeenCalled();
+    const npBar = screen.getByTestId("now-playing-bar");
+    expect(
+      within(npBar).getByRole("button", { name: /Reproduzir podcast/i }),
+    ).toBeInTheDocument();
+
+    // Retoma de onde parou: novo clique chama play() e o evento "play" sincroniza.
+    fireEvent.click(within(npBar).getByRole("button", { name: /Reproduzir podcast/i }));
+    expect(playSpy).toHaveBeenCalled();
+    fireEvent(audio, new Event("play"));
+    expect(screen.getByRole("button", { name: /Pausar podcast/i })).toBeInTheDocument();
+  });
+
+  it("silencia e restaura o volume pela barra", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Reproduzir podcast/i })[0],
+    );
+    const audio = screen.getByTestId("np-audio") as HTMLAudioElement;
+
+    fireEvent.click(screen.getByRole("button", { name: /Silenciar/i }));
+    expect(audio.muted).toBe(true);
+    expect(screen.getByRole("button", { name: /Ativar som/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Ativar som/i }));
+    expect(audio.muted).toBe(false);
+  });
+
+  it("altera a velocidade de reprodução em ciclo e aplica na mídia", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Reproduzir podcast/i })[0],
+    );
+    const audio = screen.getByTestId("np-audio") as HTMLAudioElement;
+
+    const rateButton = screen.getByRole("button", {
+      name: /Velocidade de reprodução/i,
+    });
+    expect(rateButton).toHaveTextContent("1×");
+
+    fireEvent.click(rateButton);
+
+    expect(
+      screen.getByRole("button", { name: /Velocidade de reprodução/i }),
+    ).toHaveTextContent("1.25×");
+    expect(audio.playbackRate).toBe(1.25);
+  });
+
+  it("avança e volta 15 segundos no episódio", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Reproduzir podcast/i })[0],
+    );
+    const audio = screen.getByTestId("np-audio") as HTMLAudioElement;
+    audio.currentTime = 40;
+
+    fireEvent.click(screen.getByRole("button", { name: /Avançar 15 segundos/i }));
+    expect(audio.currentTime).toBe(55);
+
+    fireEvent.click(screen.getByRole("button", { name: /Voltar 15 segundos/i }));
+    expect(audio.currentTime).toBe(40);
   });
 });
 

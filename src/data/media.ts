@@ -88,3 +88,75 @@ export const breakingVisuals: VisualFeedItem[] = [
     duration: "0:51",
   },
 ];
+
+/**
+ * Lives (reapresentações) exibidas na faixa "Lives" da seção de vídeos.
+ */
+export const lives = [
+  { id: "live-1", title: "Culto de adoração ao vivo — reapresentação", category: "Live", image: articles[0].imageUrl, duration: "1:24:10" },
+  { id: "live-2", title: "Bate-papo com a comunidade — reapresentação", category: "Live", image: articles[2].imageUrl, duration: "58:40" },
+  { id: "live-3", title: "Programa da manhã — reflexões do dia", category: "Live", image: articles[4].imageUrl, duration: "2:05:33" },
+  { id: "live-4", title: "Encontro de oração — edição da semana", category: "Live", image: articles[5].imageUrl, duration: "1:10:02" },
+];
+
+/** Próxima live programada (exibida no banner quando a rádio está fora do ar). */
+export const nextLive = {
+  title: "Culto de adoração ao vivo",
+  when: "Domingo, às 19h",
+};
+
+export interface HeroHighlight {
+  id: string;
+  kind: "live" | "video" | "reel" | "story";
+  kicker: string;
+  title: string;
+  image: string;
+  images?: string[];
+  audioUrl?: string;
+  videoUrl?: string;
+  liveWhen?: string;
+}
+
+const heroAudio = demoAudio;
+const heroAudioB = demoAudioB;
+
+/** Destaques do banner: últimas lives, notícias de capa e breaking news. */
+export const heroHighlights: HeroHighlight[] = [
+  {
+    id: "hl-1",
+    kind: "live",
+    kicker: "Última live",
+    title: "Culto de adoração ao vivo — reapresentação",
+    image: articles[0].imageUrl,
+    images: [articles[0].imageUrl, articles[3].imageUrl],
+    audioUrl: heroAudio,
+    videoUrl: demoVideo,
+  },
+  {
+    id: "hl-2",
+    kind: "reel",
+    kicker: "Breaking",
+    title: "Infraestrutura digital: o pacote de R$ 12 bilhões",
+    image: articles[1].imageUrl,
+    images: [articles[1].imageUrl, articles[4].imageUrl],
+    audioUrl: heroAudioB,
+  },
+  {
+    id: "hl-3",
+    kind: "story",
+    kicker: "Destaque",
+    title: "IA nos diagnósticos médicos do Brasil",
+    image: articles[2].imageUrl,
+    images: [articles[2].imageUrl, articles[5].imageUrl],
+    audioUrl: heroAudio,
+  },
+  {
+    id: "hl-4",
+    kind: "video",
+    kicker: "Vídeo da semana",
+    title: "Bateria solar brasileira alcança eficiência recorde",
+    image: articles[4].imageUrl,
+    images: [articles[4].imageUrl, articles[1].imageUrl],
+    audioUrl: heroAudioB,
+  },
+];

@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 describe("Home (área da rádio — separada das notícias)", () => {
-  it("renderiza as seções da rádio: hero, programação, podcasts, entretenimento e institucional", () => {
+  it("renderiza as seções da rádio: hero, programação, podcasts, entretenimento, vídeos e lives", () => {
     renderWithProviders(<Home />);
 
     // Hero da rádio (o rodapé repete a marca em heading próprio)
@@ -28,15 +28,25 @@ describe("Home (área da rádio — separada das notícias)", () => {
     expect(screen.getByRole("heading", { name: /Programação/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Podcasts" })).toBeInTheDocument();
 
-    // Entretenimento: reels + stories
+    // Entretenimento: reels + stories em duas faixas
     expect(screen.getByRole("heading", { name: /Reels e stories/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Reels da redação/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Stories em destaque/i })).toBeInTheDocument();
 
-    // Vídeos
-    expect(screen.getByRole("heading", { name: /Vídeos e cortes de lives/i })).toBeInTheDocument();
+    // Vídeos e lives separados em duas faixas
+    expect(screen.getByRole("heading", { name: /Vídeos e lives/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Vídeos" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Lives" })).toBeInTheDocument();
 
-    // Área institucional integrada
+    // A área institucional não aparece na home sem o hash #institucional
+    expect(screen.queryByText("Área institucional")).not.toBeInTheDocument();
+  });
+
+  it("renderiza a área institucional apenas ao acessar com o hash #institucional", () => {
+    renderWithProviders(<Home />);
+    expect(screen.queryByText("Área institucional")).not.toBeInTheDocument();
+
+    renderWithProviders(<Home />, { route: "/#institucional" });
     expect(screen.getByText("Área institucional")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: /Uma voz que informa, acolhe e conecta/i }),
@@ -71,6 +81,16 @@ describe("Home (área da rádio — separada das notícias)", () => {
     expect(
       screen.getAllByRole("link", { name: /Fale conosco/i })[0],
     ).toHaveAttribute("href", "/contato");
+  });
+
+  it("não expõe botão de pause no cabeçalho (controles ficam nas barras)", () => {
+    vi.stubEnv("VITE_RADIO_STREAM_URL", "https://stream.example.com/live");
+    renderWithProviders(<Home />);
+
+    const header = screen.getByRole("banner");
+    expect(within(header).queryByRole("button", { name: /Pausar/i })).not.toBeInTheDocument();
+    // Idle + stream configurada: apenas o atalho "Ouvir Agora" é oferecido.
+    expect(within(header).getByRole("button", { name: /Ouvir Agora/i })).toBeInTheDocument();
   });
 });
 

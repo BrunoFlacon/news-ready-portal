@@ -1,58 +1,195 @@
-import { Link } from "react-router-dom";
-import { ArrowRight, Heart, Mic2, Newspaper, Pause, Play, Radio, Users } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { ArrowRight, Heart, Mic2, Newspaper, Pause, Play, Radio, Users, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { MediaRail } from "@/components/MediaRail";
 import { Button } from "@/components/ui/button";
 import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
 import { podcasts } from "@/data/podcasts";
-import { institutionalServices, socialMedia, stories, videoCuts } from "@/data/media";
+import { heroHighlights, institutionalServices, lives, nextLive, socialMedia, stories, videoCuts } from "@/data/media";
 
-const heroRadioImage = "https://images.unsplash.com/photo-1589903308904-1010c2294adc?w=800&q=80";
 const institutionalImage = "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800&q=80";
+const AUTO_ROTATE_MS = 7000;
+const SLIDESHOW_MS = 3000;
 
 function RadioHero() {
   const player = useRadioPlayerContext();
   const hasStream = Boolean(player.streamUrl);
 
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [watchMode, setWatchMode] = useState(false);
+  const [slideIndex, setSlideIndex] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const active = heroHighlights[activeIndex];
+  const images = active.images && active.images.length > 0 ? active.images : [active.image];
+
+  // Rotação automática dos destaques — pausada enquanto um vídeo/live/reel/
+  // story está rodando dentro do banner.
+  useEffect(() => {
+    if (watchMode) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setActiveIndex((index) => (index + 1) % heroHighlights.length);
+    }, AUTO_ROTATE_MS);
+    return () => window.clearInterval(timer);
+  }, [watchMode]);
+
+  // Slideshow das imagens dos destaques sem vídeo real.
+  useEffect(() => {
+    if (!watchMode || active.videoUrl) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setSlideIndex((index) => (index + 1) % images.length);
+    }, SLIDESHOW_MS);
+    return () => window.clearInterval(timer);
+  }, [watchMode, active.videoUrl, images.length]);
+
+  const handleWatch = () => {
+    setSlideIndex(0);
+    setWatchMode(true);
+  };
+
+  const handleMediaEnded = () => {
+    setWatchMode(false);
+    setSlideIndex(0);
+  };
+
   return (
-    <section className="relative min-h-[520px] overflow-hidden border-b border-border md:min-h-[620px]" aria-label="Rádio ao vivo">
-      <img src={heroRadioImage} alt="" className="absolute inset-0 h-full w-full object-cover" />
-      <div className="absolute inset-0 bg-hero-overlay" />
-      <div className="container relative flex min-h-[520px] items-center py-12 md:min-h-[620px] md:py-16">
-        <div className="max-w-3xl">
-          <div className="mb-5 flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center gap-2 rounded-sm bg-live px-3 py-1.5 text-[10px] font-bold uppercase text-live-foreground">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" />
-              {hasStream ? "Ao vivo" : "Rádio online"}
-            </span>
-            <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
-              De Tupã para todo o Brasil
-            </span>
+    <section className="relative min-h-[640px] overflow-hidden border-b border-border md:min-h-[700px]" aria-label="Rádio ao vivo">
+      <div className="absolute inset-0">
+        <img src={active.image} alt="" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-hero-overlay" />
+      </div>
+      <div className="container relative flex min-h-[640px] flex-col justify-end py-12 md:min-h-[700px] md:py-16">
+        <div className="grid items-end gap-10 lg:grid-cols-[1fr_26rem]">
+          <div className="max-w-2xl">
+            <div className="mb-5 flex flex-wrap items-center gap-3">
+              {hasStream ? (
+                <span className="inline-flex items-center gap-2 rounded-sm bg-live px-3 py-1.5 text-[10px] font-bold uppercase text-live-foreground">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" />
+                  Ao vivo
+                </span>
+              ) : (
+                <>
+                  <span className="inline-flex items-center gap-2 rounded-sm bg-live px-3 py-1.5 text-[10px] font-bold uppercase text-live-foreground">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" />
+                    Em breve live
+                  </span>
+                  <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
+                    {nextLive.when}
+                  </span>
+                </>
+              )}
+              <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
+                De Tupã para todo o Brasil
+              </span>
+            </div>
+            <h1 className="font-serif text-4xl font-bold leading-tight text-overlay-foreground md:text-6xl">
+              Web Rádio Vitória
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-overlay-muted md:text-lg">
+              24 horas de programação ao vivo com música, informação e fé — e uma
+              biblioteca de podcasts, reels, stories e vídeos para ouvir e assistir
+              quando quiser.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              {hasStream && (
+                <button type="button" onClick={player.openPlayer} className="btn-brand px-10 py-4 text-sm font-bold shadow-xl transition-all duration-200 hover:shadow-2xl">
+                  <Play className="h-5 w-5 fill-current" /> Ouvir Agora
+                </button>
+              )}
+              <Button asChild variant="outline" size="lg">
+                <Link to="/noticias">
+                  <Newspaper className="h-5 w-5" /> Acessar Vitória News
+                </Link>
+              </Button>
+            </div>
           </div>
-          <h1 className="font-serif text-4xl font-bold leading-tight text-overlay-foreground md:text-6xl">
-            Web Rádio Vitória
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-overlay-muted md:text-lg">
-            24 horas de programação ao vivo com música, informação e fé — e uma
-            biblioteca de podcasts, reels, stories e vídeos para ouvir e assistir
-            quando quiser.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            {hasStream ? (
-              <button type="button" onClick={player.openPlayer} className="btn-brand px-10 py-4 text-sm font-bold shadow-xl transition-all duration-200 hover:shadow-2xl">
-                <Play className="h-5 w-5 fill-current" /> Ouvir Agora
-              </button>
-            ) : (
-              <button type="button" disabled className="inline-flex cursor-not-allowed items-center gap-2 rounded-md bg-secondary px-10 py-4 text-sm font-bold text-secondary-foreground opacity-60 shadow-xl">
-                <Play className="h-5 w-5 fill-current" /> Live em breve
-              </button>
-            )}
-            <Button asChild variant="outline" size="lg">
-              <Link to="/noticias">
-                <Newspaper className="h-5 w-5" /> Acessar Vitória News
-              </Link>
-            </Button>
+
+          {/* Destaques do banner: carrossel automático + reprodutor inline */}
+          <div className="overflow-hidden rounded-lg border border-border bg-card/90 shadow-2xl backdrop-blur-md" aria-label={`Destaque: ${active.title}`}>
+            <div className="relative aspect-video overflow-hidden bg-black">
+              {watchMode && active.videoUrl ? (
+                <>
+                  <video
+                    key={active.id}
+                    ref={videoRef}
+                    src={active.videoUrl}
+                    autoPlay
+                    controls
+                    playsInline
+                    onEnded={handleMediaEnded}
+                    className="h-full w-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setWatchMode(false)}
+                    aria-label="Fechar reprodutor do banner"
+                    className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </>
+              ) : watchMode ? (
+                <>
+                  <img key={images[slideIndex]} src={images[slideIndex]} alt="" className="h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-media-overlay" />
+                  <audio ref={audioRef} src={active.audioUrl} autoPlay onEnded={handleMediaEnded} className="hidden" />
+                  <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-sm bg-background/85 px-2 py-1 text-[10px] font-bold uppercase text-foreground">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live" />
+                    Tocando agora
+                  </span>
+                  {watchMode && (
+                    <button
+                      type="button"
+                      onClick={() => setWatchMode(false)}
+                      aria-label="Fechar reprodutor do banner"
+                      className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button type="button" onClick={handleWatch} className="group relative block h-full w-full text-left">
+                  <img src={active.image} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <div className="absolute inset-0 bg-media-overlay" />
+                  <span className="absolute left-3 top-3 rounded-sm bg-background/85 px-2 py-1 text-[10px] font-bold uppercase text-foreground">
+                    {active.kicker}
+                  </span>
+                  <span className="absolute inset-x-0 bottom-0 flex items-center gap-2 p-4">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-transform duration-200 group-hover:scale-110">
+                      <Play className="h-5 w-5 translate-x-0.5 fill-current" />
+                    </span>
+                    <span className="font-serif text-lg font-bold text-overlay-foreground">{active.title}</span>
+                  </span>
+                </button>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <p className="editorial-kicker">{active.kicker}</p>
+                <p className="mt-0.5 truncate font-serif text-sm font-bold text-foreground">{active.title}</p>
+              </div>
+              {!watchMode && (
+                <button type="button" onClick={handleWatch} className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-xs font-bold text-brand-foreground transition-colors hover:bg-accent">
+                  <Play className="h-3.5 w-3.5 fill-current" /> Assistir
+                </button>
+              )}
+              <span className="flex-shrink-0 text-xs tabular-nums text-muted-foreground">
+                {activeIndex + 1}/{heroHighlights.length}
+              </span>
+            </div>
           </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-1.5 lg:hidden" aria-hidden>
+          {heroHighlights.map((item, index) => (
+            <span key={item.id} className={`h-1.5 w-6 rounded-full ${index === activeIndex ? "bg-brand" : "bg-foreground/20"}`} />
+          ))}
         </div>
       </div>
     </section>
@@ -154,6 +291,7 @@ function ProgramSchedule() {
   );
 }
 
+/** Reels e stories juntos, em duas faixas horizontais lado a lado. */
 function EntertainmentBand() {
   return (
     <section className="page-band border-y border-border bg-card">
@@ -167,7 +305,7 @@ function EntertainmentBand() {
             Conteúdo rápido e descontraído da redação
           </span>
         </div>
-        <div className="space-y-10">
+        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
           <MediaRail title="Reels da redação" eyebrow="Reels" items={socialMedia} portrait />
           <MediaRail title="Stories em destaque" eyebrow="Stories" items={stories} portrait />
         </div>
@@ -176,7 +314,36 @@ function EntertainmentBand() {
   );
 }
 
+/** Vídeos e lives lado a lado, cada um com sua rolagem horizontal. */
+function VideosBand() {
+  return (
+    <section className="page-band">
+      <div className="container space-y-12">
+        <div className="flex items-end justify-between border-b border-border pb-4">
+          <div>
+            <p className="editorial-kicker">Assista</p>
+            <h2 className="mt-2 font-serif text-3xl font-bold">Vídeos e lives</h2>
+          </div>
+          <span className="hidden text-xs text-muted-foreground md:inline">
+            Cortes, programas e reapresentações de lives
+          </span>
+        </div>
+        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
+          <MediaRail title="Vídeos" eyebrow="Cortes" items={videoCuts} />
+          <MediaRail title="Lives" eyebrow="Reapresentações" items={lives} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** Área institucional — só é exibida ao clicar no menu Institucional. */
 function InstitutionalBand() {
+  const location = useLocation();
+  if (location.hash !== "#institucional") {
+    return null;
+  }
+
   return (
     <section id="institucional" className="border-y border-border py-16 md:py-24">
       <div className="container">
@@ -228,11 +395,7 @@ export default function Home() {
       <RadioHero />
       <ProgramSchedule />
       <EntertainmentBand />
-      <section className="page-band">
-        <div className="container">
-          <MediaRail title="Vídeos e cortes de lives" eyebrow="Assista" items={videoCuts} />
-        </div>
-      </section>
+      <VideosBand />
       <InstitutionalBand />
     </Layout>
   );

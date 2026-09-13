@@ -5,6 +5,8 @@
  * podcasts e vídeos/reels/stories) compartilhada por toda a aplicação, e
  * renderiza em qualquer página:
  *  - a barra ao vivo,
+ *  - o elemento <audio> do conteúdo atual (sempre montado — minimizar a
+ *    barra não interrompe a reprodução),
  *  - a barra estilo Spotify (podcast) com opção de minimizar,
  *  - o card flutuante quando minimizado,
  *  - o painel de sugestões pós-podcast,
@@ -30,9 +32,30 @@ interface RadioPlayerProviderProps {
 export function RadioPlayerProvider({ children }: RadioPlayerProviderProps) {
   const api = useRadioPlayer();
 
+  const npAudioUrl =
+    api.nowPlaying?.kind === "podcast" && api.nowPlaying.audioUrl
+      ? api.nowPlaying.audioUrl
+      : api.nowPlaying?.kind === "video" &&
+          !api.nowPlaying.videoUrl &&
+          api.nowPlaying.audioUrl
+        ? api.nowPlaying.audioUrl
+        : undefined;
+
   return (
     <RadioPlayerContext.Provider value={api}>
       {children}
+
+      {/* Áudio <audio> persistente: vive aqui, fora das barras, para que
+          minimizar/expandir nunca interrompa a reprodução. */}
+      {npAudioUrl && (
+        <audio
+          data-testid="np-audio"
+          ref={api.npAudioRef}
+          src={npAudioUrl}
+          preload="auto"
+          className="hidden"
+        />
+      )}
 
       <RadioPlayerBar
         url={api.streamUrl}
@@ -48,8 +71,17 @@ export function RadioPlayerProvider({ children }: RadioPlayerProviderProps) {
         <NowPlayingBar
           nowPlaying={api.nowPlaying}
           playing={api.playbackPlaying}
-          audioRef={api.npAudioRef}
-          onEnded={api.handleMediaEnded}
+          currentTime={api.currentTime}
+          duration={api.duration}
+          volume={api.volume}
+          muted={api.muted}
+          playbackRate={api.playbackRate}
+          onSeekTo={api.seekTo}
+          onSeekBackward={api.seekBackward}
+          onSeekForward={api.seekForward}
+          onToggleMute={api.toggleMute}
+          onVolumeChange={api.changeVolume}
+          onCycleRate={api.cyclePlaybackRate}
           hasQueue={api.queue.length > 0}
           onPrevious={api.playPrevious}
           onNext={api.playNext}
@@ -72,9 +104,15 @@ export function RadioPlayerProvider({ children }: RadioPlayerProviderProps) {
       {api.nowPlaying?.kind === "video" && !api.minimized && (
         <VideoBubble
           nowPlaying={api.nowPlaying}
+          muted={api.muted}
+          playbackRate={api.playbackRate}
           audioRef={api.npAudioRef}
           videoRef={api.videoRef}
           onEnded={api.handleMediaEnded}
+          onToggleMute={api.toggleMute}
+          onCycleRate={api.cyclePlaybackRate}
+          onSeekBackward={api.seekBackward}
+          onSeekForward={api.seekForward}
           onClose={api.closeNowPlaying}
         />
       )}
