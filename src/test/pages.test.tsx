@@ -79,19 +79,24 @@ describe("Home (área da rádio — separada das notícias)", () => {
     expect(screen.queryByRole("heading", { name: /Mais notícias/i })).not.toBeInTheDocument();
   });
 
-  it("expõe no topo os acessos para o portal, institucional e assinatura, com contato só no rodapé", () => {
+  it("exibe no topo Início, Institucional, 'Ouça a Rádio' e assinatura, com contato só no rodapé", () => {
     renderWithProviders(<Home />);
 
     const header = screen.getByRole("banner");
 
-    const vitoriaNewsLinks = within(header).getAllByRole("link", { name: "Vitória News" });
-    expect(vitoriaNewsLinks.length).toBeGreaterThan(0);
-    expect(vitoriaNewsLinks[0]).toHaveAttribute("href", "/noticias");
-
+    expect(within(header).getByRole("link", { name: "Início" })).toHaveAttribute(
+      "href",
+      "/",
+    );
     expect(within(header).getByRole("link", { name: "Institucional" })).toHaveAttribute(
       "href",
       "/#institucional",
     );
+
+    // O portal deixou o topo: no lugar do link "Vitória News" entrou o atalho
+    // "Ouça a Rádio" (abre a transmissão ao vivo no player do rodapé).
+    expect(within(header).queryByRole("link", { name: /Vitória News/i })).not.toBeInTheDocument();
+    expect(within(header).getByRole("button", { name: /Ouça a Rádio/i })).toBeInTheDocument();
 
     // O menu do topo não tem "Contato" nem "Fale conosco" — o contato vive
     // apenas no rodapé, e o CTA do topo agora é a assinatura.
@@ -108,6 +113,16 @@ describe("Home (área da rádio — separada das notícias)", () => {
     );
   });
 
+  it("os menus Início e Institucional exibem ícones SVG", () => {
+    renderWithProviders(<Home />);
+
+    const nav = screen.getByRole("navigation", { name: /Navegação principal/i });
+    expect(within(nav).getByRole("link", { name: "Início" }).querySelector("svg")).toBeInTheDocument();
+    expect(
+      within(nav).getByRole("link", { name: "Institucional" }).querySelector("svg"),
+    ).toBeInTheDocument();
+  });
+
   it("a rota '#assinatura' (botão Assine do topo) abre o painel premium na home", () => {
     renderWithProviders(<Home />, { route: "/#assinatura" });
 
@@ -122,8 +137,8 @@ describe("Home (área da rádio — separada das notícias)", () => {
 
     const header = screen.getByRole("banner");
     expect(within(header).queryByRole("button", { name: /Pausar/i })).not.toBeInTheDocument();
-    // Idle + stream configurada: apenas o atalho "Ouvir Agora" é oferecido.
-    expect(within(header).getByRole("button", { name: /Ouvir Agora/i })).toBeInTheDocument();
+    // Idle + stream configurada: apenas o atalho "Ouça a Rádio" é oferecido.
+    expect(within(header).getByRole("button", { name: /Ouça a Rádio/i })).toBeInTheDocument();
   });
 });
 

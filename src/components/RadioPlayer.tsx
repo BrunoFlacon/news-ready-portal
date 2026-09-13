@@ -16,17 +16,24 @@
  *    escolhido em 3 segundos, um vídeo/reel/story "breaking" recomendado
  *    começa a tocar automaticamente em um card flutuante.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ChevronLeft,
   ChevronRight,
   Gauge,
   Headphones,
+  Heart,
+  Link2,
   Maximize2,
+  MessageCircle,
+  Mic2,
   Minimize2,
+  MoreVertical,
+  Music,
   Pause,
   Play,
   Radio,
+  Share2,
   SkipBack,
   SkipForward,
   Video,
@@ -35,8 +42,15 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { SITE_URL, whatsAppLink } from "@/lib/whatsapp";
 import { podcasts, type Podcast } from "@/data/podcasts";
-import { breakingVisuals, type VisualFeedItem } from "@/data/media";
+import {
+  breakingVisuals,
+  schedule,
+  upcomingLive,
+  type VisualFeedItem,
+} from "@/data/media";
 
 export function getRadioStreamUrl(): string {
   return (import.meta.env.VITE_RADIO_STREAM_URL as string | undefined) || "";
@@ -463,7 +477,23 @@ interface RadioPlayerBarProps {
   audioRef: React.RefObject<HTMLAudioElement>;
 }
 
-/** Barra da transmissão ao vivo (fixa no rodapé). */
+const LIVE_LIKE_KEY = "radio.liked";
+const LIVE_LIKES_METRIC_KEY = "radio.likes.total";
+
+function readStoredLiked(): boolean {
+  try {
+    return window.localStorage.getItem(LIVE_LIKE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Barra da transmissão ao vivo — compacta, dark e flutuante no rodapé
+ * (estilo Spotify). Mostra o programa no ar, apresentador, horário e
+ * cidade/estado, além de curtir (métricas), volume e o menu de três
+ * pontos com pedir música, WhatsApp, compartilhar e link para amigos.
+ */
 export function RadioPlayerBar({
   url,
   open,
@@ -473,63 +503,379 @@ export function RadioPlayerBar({
   closePlayer,
   audioRef,
 }: RadioPlayerBarProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [liked, setLiked] = useState(readStoredLiked);
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [volume, setVolume] = useState(1);
+  const [muted, setMuted] = useState(false);
+
+  // Aplica o volume do player ao elemento <audio> da transmissão.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+    audio.volume = volume;
+    audio.muted = muted;
+  }, [audioRef, volume, muted]);
+
   if (!url || !open) {
     return null;
   }
 
+  const program = upcomingLive ?? schedule[0];
+
+  const openInNewTab = (href: string) => {
+    window.open(href, "_blank");
+  };
+
+  const toggleLike = () => {
+    setLiked((value) => {
+      const next = !value;
+      try {
+        window.localStorage.setItem(LIVE_LIKE_KEY, next ? "1" : "0");
+        // Métrica simples: total de curtidas registradas neste navegador.
+        const total = Number(window.localStorage.getItem(LIVE_LIKES_METRIC_KEY) || "0");
+        window.localStorage.setItem(
+          LIVE_LIKES_METRIC_KEY,
+          String(Math.max(0, total + (next ? 1 : -1))),
+        );
+      } catch {
+        // Sem armazenamento local, a curtida segue apenas visual.
+      }
+      return next;
+    });
+  };
+
+  const applyVolume = (value: number) => {
+    const next = Math.max(0, Math.min(1, value));
+    setVolume(next);
+    setMuted(next === 0);
+  };
+
+  const menuItems = [
+    {
+      label: "Pedir música",
+      icon: Music,
+      onClick: () => setRequestOpen(true),
+    },
+    {
+      label: "Enviar mensagem no WhatsApp",
+      icon: MessageCircle,
+      onClick: () =>
+        openInNewTab(
+          whatsAppLink("Olá! Quero falar com a Web Rádio Vitória."),
+        ),
+    },
+    {
+      label: "Compartilhar nas redes sociais",
+      icon: Share2,
+      onClick: () => setShareOpen(true),
+    },
+    {
+      label: "Enviar o link da rádio no WhatsApp",
+      icon: Link2,
+      onClick: () =>
+        openInNewTab(
+          whatsAppLink(
+            `Ouça a Web Rádio Vitória ao vivo: ${window.location.href}`,
+          ),
+        ),
+    },
+    {
+      label: "Pedir música por áudio",
+      icon: Mic2,
+      onClick: () =>
+        openInNewTab(
+          whatsAppLink("Quero pedir uma música por áudio na Web Rádio Vitória."),
+        ),
+    },
+  ];
+
   return (
     <div
       data-testid="radio-player-bar"
-      className="fixed inset-x-0 bottom-0 z-[60] border-t border-brand/40 bg-card/95 backdrop-blur-md shadow-brand"
+      className="fixed inset-x-0 bottom-0 z-[60] border-t border-white/10 bg-neutral-950/95 text-white shadow-2xl backdrop-blur-md"
     >
-      <div className="h-0.5 animate-pulse bg-gradient-to-r from-transparent via-brand to-transparent" />
-      <div className="container mx-auto flex items-center gap-4 px-4 py-3">
+      <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-2.5 sm:gap-4">
         <audio ref={audioRef} src={url} preload="none" />
         <button
           type="button"
           onClick={togglePlay}
           aria-label={playing ? "Pausar transmissão" : "Reproduzir transmissão"}
           aria-pressed={playing}
-          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-colors hover:bg-accent"
+          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-colors hover:bg-accent"
         >
           {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 translate-x-0.5 fill-current" />}
         </button>
+
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <Radio className="h-4 w-4 flex-shrink-0 text-brand" />
-            <span className="truncate text-sm font-bold text-foreground">Web Rádio Vitória</span>
-            <span className="hidden items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground sm:inline-flex">
-              <span className={cn("h-1.5 w-1.5 rounded-full", playing ? "animate-pulse bg-live" : "bg-border")} />
-              Ao Vivo
+          <div className="flex items-center gap-2.5">
+            <span className="hidden h-5 items-end gap-0.5 sm:flex" aria-hidden>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    "w-1 rounded-full transition-all duration-300",
+                    playing ? "bg-brand wave-bar" : "bg-neutral-700",
+                  )}
+                  style={{
+                    height: playing ? `${6 + ((i * 7) % 14)}px` : "3px",
+                    animationDelay: playing ? `${i * 0.06}s` : undefined,
+                    animationDuration: playing ? `${0.7 + ((i * 13) % 9) / 10}s` : undefined,
+                  }}
+                />
+              ))}
             </span>
-          </div>
-          <div className="mt-1 flex h-5 items-end gap-0.5" aria-hidden>
-            {Array.from({ length: 24 }).map((_, i) => (
-              <span
-                key={i}
-                className={cn("w-1 rounded-full transition-all duration-300", playing ? "bg-brand wave-bar" : "bg-border")}
-                style={{
-                  height: playing ? `${8 + ((i * 7) % 18)}px` : "4px",
-                  animationDelay: playing ? `${i * 0.06}s` : undefined,
-                  animationDuration: playing ? `${0.7 + ((i * 13) % 9) / 10}s` : undefined,
-                }}
-              />
-            ))}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-white">
+                {program.title}
+              </p>
+              <p className="truncate text-[11px] text-neutral-400">
+                {program.host} · {program.day} • {program.time} · Tupã, SP
+              </p>
+            </div>
           </div>
           {error && (
-            <p className="mt-0.5 text-xs text-destructive" role="alert">
+            <p className="mt-0.5 text-xs text-red-400" role="alert">
               Não foi possível iniciar o áudio. Verifique sua conexão e clique em reproduzir novamente.
             </p>
           )}
         </div>
+
+        <button
+          type="button"
+          onClick={toggleLike}
+          aria-label={liked ? "Descurtir programa" : "Curtir programa"}
+          aria-pressed={liked}
+          title={liked ? "Descurtir" : "Curtir"}
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-neutral-300 transition-colors hover:text-white"
+        >
+          <Heart
+            className={cn(
+              "h-[18px] w-[18px]",
+              liked ? "fill-red-500 text-red-500" : "text-neutral-300",
+            )}
+          />
+        </button>
+
+        <div className="hidden flex-shrink-0 items-center gap-2 md:flex">
+          <button
+            type="button"
+            onClick={() => setMuted((value) => !value)}
+            aria-label={muted || volume === 0 ? "Ativar som" : "Silenciar"}
+            aria-pressed={muted || volume === 0}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-300 transition-colors hover:text-white"
+          >
+            {muted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+          <input
+            type="range"
+            aria-label="Volume"
+            min={0}
+            max={100}
+            step={1}
+            value={muted ? 0 : Math.round(volume * 100)}
+            onChange={(e) => applyVolume(Number(e.target.value) / 100)}
+            className="h-1 w-20 accent-brand"
+          />
+        </div>
+
+        <div className="relative flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((value) => !value)}
+            aria-label="Mais opções"
+            aria-expanded={menuOpen}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-300 transition-colors hover:text-white"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </button>
+          {menuOpen && (
+            <ul
+              data-testid="live-player-menu"
+              role="menu"
+              aria-label="Opções da rádio"
+              className="absolute bottom-full right-0 z-[70] mb-2 w-72 rounded-lg border border-white/10 bg-neutral-900 p-1.5 shadow-2xl"
+            >
+              {menuItems.map((item) => (
+                <li key={item.label}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      item.onClick();
+                    }}
+                    className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-medium text-neutral-100 transition-colors hover:bg-white/10"
+                  >
+                    <item.icon className="h-4 w-4 flex-shrink-0 text-brand" />
+                    {item.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={closePlayer}
           aria-label="Fechar player"
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground"
+          title="Fechar player"
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-neutral-400 transition-colors hover:text-white"
         >
           <X className="h-4 w-4" />
         </button>
+      </div>
+
+      {requestOpen && <RequestMusicDialog onClose={() => setRequestOpen(false)} />}
+      {shareOpen && <ShareDialog onClose={() => setShareOpen(false)} />}
+    </div>
+  );
+}
+
+interface RequestMusicDialogProps {
+  onClose: () => void;
+}
+
+/** Diálogo "Pedir música": o pedido é enviado pelo WhatsApp da rádio. */
+export function RequestMusicDialog({ onClose }: RequestMusicDialogProps) {
+  const [name, setName] = useState("");
+  const [song, setSong] = useState("");
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const message = [
+      "📻 Pedido de música",
+      "",
+      `Nome: ${name}`,
+      `Música: ${song}`,
+      `Ouvindo a Web Rádio Vitória em ${window.location.href}`,
+    ].join("\n");
+    window.open(whatsAppLink(message), "_blank");
+    onClose();
+  };
+
+  return (
+    <div
+      data-testid="request-music-dialog"
+      role="dialog"
+      aria-label="Pedir música"
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+    >
+      <button
+        type="button"
+        aria-label="Fechar"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/70"
+      />
+      <div className="relative w-full max-w-sm rounded-xl border border-white/10 bg-neutral-900 p-5 text-white shadow-2xl">
+        <button
+          type="button"
+          aria-label="Fechar diálogo"
+          onClick={onClose}
+          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:text-white"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <p className="editorial-kicker">Pedido do ouvinte</p>
+        <h3 className="mt-1 font-serif text-lg font-bold">Pedir música</h3>
+        <form onSubmit={submit} className="mt-4 space-y-3">
+          <input
+            aria-label="Seu nome"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Seu nome"
+            required
+            className="w-full rounded-md border border-white/10 bg-neutral-800 px-3 py-2 text-sm placeholder:text-neutral-500 focus:border-brand focus:outline-none"
+          />
+          <input
+            aria-label="Música e artista"
+            value={song}
+            onChange={(e) => setSong(e.target.value)}
+            placeholder="Música e artista"
+            required
+            className="w-full rounded-md border border-white/10 bg-neutral-800 px-3 py-2 text-sm placeholder:text-neutral-500 focus:border-brand focus:outline-none"
+          />
+          <Button type="submit" className="w-full">
+            <Music className="h-4 w-4" /> Enviar pedido
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+interface ShareDialogProps {
+  onClose: () => void;
+}
+
+/** Diálogo "Compartilhar": links prontos para as redes sociais. */
+export function ShareDialog({ onClose }: ShareDialogProps) {
+  const pageUrl = window.location.href || SITE_URL;
+  const encodedUrl = encodeURIComponent(pageUrl);
+  const shareText = encodeURIComponent("Web Rádio Vitória — confira a programação");
+
+  const shareLinks = [
+    {
+      label: "WhatsApp",
+      href: `https://wa.me/?text=${shareText}%20${encodedUrl}`,
+    },
+    {
+      label: "Facebook",
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+    },
+    {
+      label: "Telegram",
+      href: `https://t.me/share/url?url=${encodedUrl}&text=${shareText}`,
+    },
+    {
+      label: "X (Twitter)",
+      href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${shareText}`,
+    },
+  ];
+
+  return (
+    <div
+      data-testid="share-dialog"
+      role="dialog"
+      aria-label="Compartilhar nas redes sociais"
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+    >
+      <button
+        type="button"
+        aria-label="Fechar"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/70"
+      />
+      <div className="relative w-full max-w-sm rounded-xl border border-white/10 bg-neutral-900 p-5 text-white shadow-2xl">
+        <button
+          type="button"
+          aria-label="Fechar diálogo"
+          onClick={onClose}
+          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:text-white"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <p className="editorial-kicker">Compartilhar</p>
+        <h3 className="mt-1 font-serif text-lg font-bold">Espalhe a Web Rádio Vitória</h3>
+        <ul className="mt-4 space-y-2">
+          {shareLinks.map((link) => (
+            <li key={link.label}>
+              <a
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center gap-3 rounded-md border border-white/10 bg-neutral-800 px-3 py-2.5 text-sm font-medium transition-colors hover:border-brand/60"
+              >
+                <Share2 className="h-4 w-4 flex-shrink-0 text-brand" />
+                {link.label}
+              </a>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

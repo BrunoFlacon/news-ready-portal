@@ -1,14 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Radio, Play, Newspaper, Crown } from "lucide-react";
+import { Building2, Crown, Home, Menu, Play, Radio, X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
 
 const navItems = [
-  { label: "Início", path: "/" },
-  { label: "Vitória News", path: "/noticias" },
-  { label: "Institucional", path: "/#institucional" },
+  { label: "Início", path: "/", icon: Home },
+  { label: "Institucional", path: "/#institucional", icon: Building2 },
 ];
 
 export function SiteHeader() {
@@ -29,11 +28,9 @@ export function SiteHeader() {
     return pathname === path;
   };
 
-  // O cabeçalho só oferece "Ouvir Agora" quando a transmissão está disponível
-  // e nada está em reprodução — os controles de pause/retomada ficam nas
-  // barras inferior e flutuante.
-  const showListenButton =
-    Boolean(player.streamUrl) && !player.liveOpen && !player.nowPlaying;
+  // "Ouça a Rádio" abre a transmissão ao vivo e o player do rodapé; sem URL
+  // configurada o atalho fica indisponível (como o botão do banner).
+  const canListen = Boolean(player.streamUrl);
   const isLiveOnAir =
     Boolean(player.streamUrl) && player.liveOpen && player.livePlaying;
 
@@ -57,16 +54,6 @@ export function SiteHeader() {
               <span className="h-2 w-2 animate-pulse rounded-full bg-live" />Ao vivo
             </span>
           )}
-          {showListenButton && (
-            <button
-              type="button"
-              onClick={player.openPlayer}
-              className="btn-brand hidden h-9 px-4 lg:inline-flex"
-            >
-              <Play className="h-4 w-4 fill-current" />
-              Ouvir Agora
-            </button>
-          )}
 
           {/* Navegação na mesma linha do topo: menu compacto à direita no
               desktop e menu expansível no mobile — a barra separada foi
@@ -87,25 +74,45 @@ export function SiteHeader() {
                       to={item.path}
                       aria-current={isActive ? "page" : undefined}
                       className={cn(
-                        "block border-l-2 px-4 py-3 text-xs font-bold uppercase transition-colors lg:border-b-2 lg:border-l-0 lg:px-0 lg:py-1.5",
+                        "flex items-center gap-1.5 border-l-2 px-4 py-3 text-xs font-bold uppercase transition-colors lg:border-b-2 lg:border-l-0 lg:px-0 lg:py-1.5",
                         isActive
                           ? "border-primary text-foreground"
                           : "border-transparent text-muted-foreground hover:text-foreground",
                       )}
                       onClick={() => setMenuOpen(false)}
                     >
-                      {item.label === "Vitória News" ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <Newspaper className="h-3.5 w-3.5" />
-                          {item.label}
-                        </span>
-                      ) : (
-                        item.label
-                      )}
+                      <item.icon className="h-3.5 w-3.5" />
+                      {item.label}
                     </Link>
                   </li>
                 );
               })}
+              {/* "Ouça a Rádio": abre a transmissão ao vivo e o player do rodapé. */}
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    player.openPlayer();
+                  }}
+                  disabled={!canListen}
+                  aria-disabled={!canListen}
+                  title={
+                    canListen
+                      ? "Ouvir a rádio ao vivo"
+                      : "Configure VITE_RADIO_STREAM_URL no arquivo .env para liberar a transmissão"
+                  }
+                  className={cn(
+                    "flex items-center gap-1.5 border-l-2 px-4 py-3 text-xs font-bold uppercase transition-colors lg:border-b-2 lg:border-l-0 lg:px-0 lg:py-1.5",
+                    canListen
+                      ? "border-transparent text-muted-foreground hover:text-foreground"
+                      : "cursor-not-allowed border-transparent text-muted-foreground/50",
+                  )}
+                >
+                  <Play className="h-3.5 w-3.5" />
+                  Ouça a Rádio
+                </button>
+              </li>
             </ul>
           </nav>
 

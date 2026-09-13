@@ -47,13 +47,13 @@ describe("RadioPlayer — player global no cabeçalho", () => {
     expect(screen.queryByTestId("radio-player-bar")).not.toBeInTheDocument();
   });
 
-  it("com a URL do stream configurada, clicar em 'Ouvir Agora' abre a barra global com o elemento de áudio", async () => {
+  it("com a URL do stream configurada, clicar em 'Ouça a Rádio' abre a barra global com o elemento de áudio", async () => {
     vi.stubEnv("VITE_RADIO_STREAM_URL", "https://stream.example.com/live");
     mockMedia();
 
     renderWithProviders(<Home />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: /Ouvir Agora/i })[0]);
+    fireEvent.click(screen.getByRole("button", { name: /Ouça a Rádio/i }));
 
     const bar = await screen.findByTestId("radio-player-bar");
     expect(bar).toBeInTheDocument();
@@ -160,6 +160,176 @@ describe("useRadioPlayer", () => {
   });
 });
 
+describe("RadioPlayer — barra ao vivo compacta (estilo Spotify)", () => {
+  const renderBar = () =>
+    render(
+      <RadioPlayerBar
+        url="https://stream.example.com/live"
+        open
+        playing={false}
+        error={false}
+        togglePlay={vi.fn()}
+        closePlayer={vi.fn()}
+        audioRef={createRef<HTMLAudioElement>()}
+      />,
+    );
+
+  it("mostra programa no ar, apresentador, horário e cidade/estado", () => {
+    renderBar();
+
+    const bar = screen.getByTestId("radio-player-bar");
+    expect(within(bar).getByText(/Culto de adoração ao vivo/)).toBeInTheDocument();
+    expect(within(bar).getByText(/Equipe Web Rádio Vitória/)).toBeInTheDocument();
+    expect(within(bar).getByText(/Domingo • 19h/)).toBeInTheDocument();
+    expect(within(bar).getByText(/Tupã, SP/)).toBeInTheDocument();
+  });
+
+  it("o coração curte/descurte o programa e registra a métrica no navegador", () => {
+    renderBar();
+
+    fireEvent.click(screen.getByRole("button", { name: /Curtir programa/i }));
+    expect(
+      screen.getByRole("button", { name: /Descurtir programa/i }),
+    ).toBeInTheDocument();
+    expect(window.localStorage.getItem("radio.likes.total")).toBe("1");
+
+    fireEvent.click(screen.getByRole("button", { name: /Descurtir programa/i }));
+    expect(
+      screen.getByRole("button", { name: /Curtir programa/i }),
+    ).toBeInTheDocument();
+    expect(window.localStorage.getItem("radio.likes.total")).toBe("0");
+  });
+
+  it("o menu de três pontos reúne pedir música, WhatsApp e compartilhar", () => {
+    renderBar();
+
+    fireEvent.click(screen.getByRole("button", { name: /Mais opções/i }));
+    const menu = screen.getByTestId("live-player-menu");
+    expect(within(menu).getByRole("menuitem", { name: "Pedir música" })).toBeInTheDocument();
+    expect(
+      within(menu).getByRole("menuitem", { name: /Enviar mensagem no WhatsApp/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole("menuitem", { name: /Compartilhar nas redes sociais/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole("menuitem", { name: /Enviar o link da rádio no WhatsApp/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole("menuitem", { name: "Pedir música por áudio" }),
+    ).toBeInTheDocument();
+  });
+
+  it("'Pedir música' abre o diálogo e enviar o pedido abre o WhatsApp", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderBar();
+
+    fireEvent.click(screen.getByRole("button", { name: /Mais opções/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Pedir música" }));
+
+    const dialog = screen.getByTestId("request-music-dialog");
+    expect(dialog).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Seu nome"), { target: { value: "Ana" } });
+    fireEvent.change(screen.getByLabelText("Música e artista"), {
+      target: { value: "Louvor no altar" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Enviar pedido/i }));
+
+    expect(open).toHaveBeenCalledWith(expect.stringContaining("wa.me/"), "_blank");
+    expect(screen.queryByTestId("request-music-dialog")).not.toBeInTheDocument();
+  });
+
+  it("'Compartilhar nas redes sociais' abre diálogo com os links", () => {
+    renderBar();
+
+    fireEvent.click(screen.getByRole("button", { name: /Mais opções/i }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: /Compartilhar nas redes sociais/i }),
+    );
+
+    const dialog = screen.getByTestId("share-dialog");
+    expect(within(dialog).getByRole("link", { name: "WhatsApp" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("wa.me"),
+    );
+    expect(within(dialog).getByRole("link", { name: "Facebook" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("facebook.com"),
+    );
+    expect(within(dialog).getByRole("link", { name: "Telegram" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("t.me"),
+    );
+    expect(within(dialog).getByRole("link", { name: "X (Twitter)" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("twitter.com"),
+    );
+  });
+
+  it("enviar o link da rádio no WhatsApp abre o wa.me com a mensagem", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderBar();
+
+    fireEvent.click(screen.getByRole("button", { name: /Mais opções/i }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: /Enviar o link da rádio no WhatsApp/i }),
+    );
+
+    expect(open).toHaveBeenCalledWith(expect.stringContaining("wa.me/"), "_blank");
+    const openedUrl = open.mock.calls[0][0] as string;
+    expect(decodeURIComponent(openedUrl)).toContain(
+      "Ouça a Web Rádio Vitória ao vivo",
+    );
+  });
+
+  it("'Pedir música por áudio' abre o WhatsApp direto", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderBar();
+
+    fireEvent.click(screen.getByRole("button", { name: /Mais opções/i }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: /Pedir música por áudio/i }),
+    );
+
+    expect(open).toHaveBeenCalledWith(expect.stringContaining("wa.me/"), "_blank");
+    const openedUrl = open.mock.calls[0][0] as string;
+    expect(decodeURIComponent(openedUrl)).toContain("pedir uma música por áudio");
+  });
+});
+
+describe("RadioPlayer — 'Ouça a Rádio' no cabeçalho", () => {
+  it("sem stream configurada o atalho fica indisponível", () => {
+    vi.stubEnv("VITE_RADIO_STREAM_URL", "");
+    renderWithProviders(<Home />);
+
+    const header = screen.getByRole("banner");
+    expect(
+      within(header).getByRole("button", { name: /Ouça a Rádio/i }),
+    ).toBeDisabled();
+  });
+
+  it("com stream, clicar em 'Ouça a Rádio' abre a transmissão ao vivo no rodapé", async () => {
+    vi.stubEnv("VITE_RADIO_STREAM_URL", "https://stream.example.com/live");
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    const header = screen.getByRole("banner");
+    fireEvent.click(
+      within(header).getByRole("button", { name: /Ouça a Rádio/i }),
+    );
+
+    const bar = await screen.findByTestId("radio-player-bar");
+    expect(bar).toBeInTheDocument();
+
+    // O estado "tocando" vem do evento real do <audio> — simula para validar
+    // que o cabeçalho passa a indicar "Ao vivo".
+    const audio = bar.querySelector("audio");
+    expect(audio).not.toBeNull();
+    fireEvent(audio as Element, new Event("play"));
+    expect(within(header).getByText("Ao vivo")).toBeInTheDocument();
+  });
+});
+
 describe("Podcast — barra estilo Spotify pausa a transmissão ao vivo", () => {
   it("ao tocar um podcast, a rádio ao vivo é pausada e a barra do episódio entra no lugar", () => {
     vi.stubEnv("VITE_RADIO_STREAM_URL", "https://stream.example.com/live");
@@ -168,7 +338,7 @@ describe("Podcast — barra estilo Spotify pausa a transmissão ao vivo", () => 
     renderWithProviders(<Home />);
 
     // Abre a transmissão ao vivo pelo cabeçalho.
-    fireEvent.click(screen.getAllByRole("button", { name: /Ouvir Agora/i })[0]);
+    fireEvent.click(screen.getByRole("button", { name: /Ouça a Rádio/i }));
     expect(screen.getByTestId("radio-player-bar")).toBeInTheDocument();
 
     // Toca o primeiro podcast da programação.
