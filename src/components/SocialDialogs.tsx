@@ -299,10 +299,9 @@ function DialogShell({ testId, ariaLabel, kicker, title, onClose, children }: Di
 interface SocialBarProps {
   publicationId: string;
   title: string;
-  visible: boolean;
 }
 
-export function SocialBar({ publicationId, title, visible }: SocialBarProps) {
+export function SocialBar({ publicationId, title }: SocialBarProps) {
   const social = useSocialItem(publicationId);
   const [dialog, setDialog] = useState<"comments" | "share" | "invite" | null>(null);
 
@@ -310,10 +309,7 @@ export function SocialBar({ publicationId, title, visible }: SocialBarProps) {
     <>
       <div
         data-testid="social-bar"
-        className={cn(
-          "absolute bottom-20 left-4 z-20 flex items-center gap-1 rounded-full border border-white/10 bg-black/50 px-2 py-1.5 shadow-2xl backdrop-blur-md transition-opacity duration-200 lg:bottom-24",
-          visible ? "opacity-100" : "pointer-events-none opacity-0",
-        )}
+        className="absolute bottom-20 left-4 z-20 flex items-center gap-1 rounded-full border border-white/10 bg-black/50 px-2 py-1.5 shadow-2xl backdrop-blur-md lg:bottom-24"
       >
         <SocialIconButton
           label={social.liked ? "Descurtir publicação" : "Curtir publicação"}
@@ -357,10 +353,9 @@ export function SocialBar({ publicationId, title, visible }: SocialBarProps) {
 interface SocialRailProps {
   publicationId: string;
   title: string;
-  visible: boolean;
 }
 
-export function SocialRail({ publicationId, title, visible }: SocialRailProps) {
+export function SocialRail({ publicationId, title }: SocialRailProps) {
   const social = useSocialItem(publicationId);
   const [dialog, setDialog] = useState<"comments" | "share" | "invite" | null>(null);
 
@@ -368,10 +363,7 @@ export function SocialRail({ publicationId, title, visible }: SocialRailProps) {
     <>
       <div
         data-testid="social-rail"
-        className={cn(
-          "absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center gap-4 rounded-full border border-white/10 bg-black/50 px-2.5 py-4 shadow-2xl backdrop-blur-md transition-opacity duration-200",
-          visible ? "opacity-100" : "pointer-events-none opacity-0",
-        )}
+        className="absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center gap-4 rounded-full border border-white/10 bg-black/50 px-2.5 py-4 shadow-2xl backdrop-blur-md"
       >
         <SocialIconButton
           label={social.liked ? "Descurtir publicação" : "Curtir publicação"}

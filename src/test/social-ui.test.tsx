@@ -46,6 +46,9 @@ describe("Ferramentas sociais — barra horizontal (YouTube fullscreen)", () => 
       expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
     });
     expect(screen.getByTestId("social-bar")).toBeInTheDocument();
+    // As barras sociais ficam sempre visíveis (não somem com o auto-hide dos
+    // controles estilo YouTube após 10s de inatividade).
+    expect(screen.getByTestId("social-bar").className).not.toContain("pointer-events-none");
     expect(screen.getByRole("button", { name: "Curtir publicação" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Comentar publicação" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Compartilhar publicação" })).toBeInTheDocument();

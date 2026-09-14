@@ -114,6 +114,7 @@ function WatchOverlay({
       style={{ "--ambient-a": ambient.a, "--ambient-b": ambient.b } as CSSProperties}
       onMouseEnter={onShowUi}
       onMouseLeave={onHideUi}
+      onTouchStart={onShowUi}
     >
       {!transitioning && (
         <>
@@ -188,17 +189,9 @@ function WatchOverlay({
               horizontais) ou rail vertical (reels/stories), com curtir,
               comentar, compartilhar e convidar amigos para assinar. */}
           {vertical ? (
-            <SocialRail
-              publicationId={item.id}
-              title={item.title}
-              visible={uiVisible}
-            />
+            <SocialRail publicationId={item.id} title={item.title} />
           ) : (
-            <SocialBar
-              publicationId={item.id}
-              title={item.title}
-              visible={uiVisible}
-            />
+            <SocialBar publicationId={item.id} title={item.title} />
           )}
         </>
       )}
