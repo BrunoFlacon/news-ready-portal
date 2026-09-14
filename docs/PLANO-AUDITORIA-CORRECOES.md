@@ -1,6 +1,15 @@
 # Plano de Auditoria e Correções — Vitória News
 
-> Status: **proposto** · Área: layout/player/mobile · Repo: news-ready-portal
+> Status: **em execução** · Área: layout/player/mobile · Repo: news-ready-portal
+>
+> Progresso:
+> - ✅ **Onda 1** (1.1, 1.2) — commit `e60ff39` — transporte no padrão YouTube/Spotify
+>   (voltar 15s à esquerda do play) + seletor de velocidade compacto "1×" com menu, no
+>   centro após "Avançar 15s".
+> - ✅ **Onda 2** (2.1, 2.2, 2.3, 3.1) — commit `7249c54` — rail vertical com CSS limpo
+>   (sem backdrop-blur/shadow/border) e contadores à esquerda dos ícones; reels 9:16
+>   preenchem a altura do banner e vídeos 16:9 voltam a preencher a tela (regressão do
+>   wrapper `relative` corrigida com `h-full w-full` + `w-fit` no vertical).
 
 Este plano cobre erros, bugs, lags e problemas de layout relatados pelo editor, com
 foco no player do banner gigante, nas barras sociais, no player de podcast e na
@@ -80,6 +89,7 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 
 ### 2.1 CSS do rail: apagar classes "desativadas" e aplicar configuração limpa
 
+- **Status:** ✅ implementado (Onda 2, commit `7249c54`).
 - **Problema:** o editor inspecionou o elemento `[data-testid="social-rail"]` e
   encontrou várias regras CSS marcadas como desativadas/sobrescritas
   (`/* ... */` no DevTools): `backdrop-blur-md`, `shadow-2xl`, `border`,
@@ -118,6 +128,7 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 
 ### 2.2 Rail vertical: contadores à ESQUERDA dos ícones
 
+- **Status:** ✅ implementado (Onda 2, commit `7249c54`).
 - **Problema:** no rail vertical, a contagem exibida (curtidas, comentários,
   compartilhamentos, salvamentos, indicações) aparece **à direita** do SVG
   (`<Heart/><span>1</span>`). O editor quer o número **antes** (à esquerda) do
@@ -141,6 +152,7 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 
 ### 2.3 Reels/stories 9:16 precisam preencher a ALTURA do banner gigante
 
+- **Status:** ✅ implementado (Onda 2, commit `7249c54`).
 - **Problema:** vídeos verticais (reels/stories) ficam pequenos no banner do
   player — não ocupam a altura do banner gigante.
 - **Causa raiz:** `YouTubePlayer.tsx:589-592` — para vertical:
@@ -171,6 +183,7 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 
 ### 3.1 Vídeos horizontais 16:9 voltam a preencher a tela (regressão)
 
+- **Status:** ✅ implementado (Onda 2, commit `7249c54`).
 - **Problema:** vídeos 16:9 não preenchem mais a tela como antes do commit
   `110d911` (que introduziu o wrapper `relative` para o rail).
 - **Causa raiz:** `Home.tsx:130-147` — o `<div className="relative">` passou a
