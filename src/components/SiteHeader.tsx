@@ -44,7 +44,7 @@ export function SiteHeader() {
           </span>
           <span className="min-w-0">
             <strong className="block truncate font-serif text-lg text-foreground">Web Rádio Vitória</strong>
-            <small className="block truncate text-[10px] uppercase text-muted-foreground">Notícias • Informação • Fé</small>
+            <small className="block truncate text-[10px] uppercase text-muted-foreground">DE TUPÃ PARA TODO O BRASIL</small>
           </span>
         </Link>
 
