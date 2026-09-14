@@ -85,6 +85,12 @@
   .wave-bar { display: inline-block; transform-origin: bottom; animation: wave 1s ease-in-out infinite; }
   /* Slider de progresso (barra estilo Spotify) */
   .range-brand { accent-color: hsl(var(--brand)); }
+  /* Slider de volume vertical da barra da rádio: cresce de baixo para cima */
+  .volume-slider {
+    accent-color: hsl(var(--brand));
+    writing-mode: vertical-lr;
+    direction: rtl;
+  }
   /* Fundo ambiente do banner gigante: cores capturadas do vídeo com desfoque
      suave animado para preencher telas grandes sem deixar áreas vazias. */
   @keyframes ambient-drift {

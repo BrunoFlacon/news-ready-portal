@@ -15,6 +15,7 @@
 import { createContext, useContext } from "react";
 import {
   FloatingPlayer,
+  LiveMiniCard,
   NowPlayingBar,
   RadioPlayerBar,
   SuggestionsPanel,
@@ -57,15 +58,41 @@ export function RadioPlayerProvider({ children }: RadioPlayerProviderProps) {
         />
       )}
 
-      <RadioPlayerBar
-        url={api.streamUrl}
-        open={api.liveOpen}
-        playing={api.livePlaying}
-        error={api.liveError}
-        togglePlay={api.toggleLivePlay}
-        closePlayer={api.closePlayer}
-        audioRef={api.liveAudioRef}
-      />
+      {/* Áudio <audio> do stream ao vivo: vive aqui, fora da barra, para
+          que minimizar/expandir nunca interrompa a transmissão. */}
+      {api.liveOpen && (
+        <audio
+          data-testid="live-audio"
+          ref={api.liveAudioRef}
+          src={api.streamUrl}
+          preload="none"
+        />
+      )}
+
+      {api.liveOpen && !api.minimized && (
+        <RadioPlayerBar
+          url={api.streamUrl}
+          open={api.liveOpen}
+          playing={api.livePlaying}
+          error={api.liveError}
+          togglePlay={api.toggleLivePlay}
+          closePlayer={api.closePlayer}
+          audioRef={api.liveAudioRef}
+          onMinimize={api.minimize}
+        />
+      )}
+
+      {api.liveOpen && api.minimized && (
+        <LiveMiniCard
+          url={api.streamUrl}
+          playing={api.livePlaying}
+          error={api.liveError}
+          togglePlay={api.toggleLivePlay}
+          expand={api.expand}
+          closePlayer={api.closePlayer}
+          audioRef={api.liveAudioRef}
+        />
+      )}
 
       {api.nowPlaying?.kind === "podcast" && !api.minimized && (
         <NowPlayingBar

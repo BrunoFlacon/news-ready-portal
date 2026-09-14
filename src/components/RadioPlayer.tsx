@@ -159,6 +159,7 @@ export function useRadioPlayer(): RadioPlayerApi {
     setNowPlaying(null);
     setSuggestionsOpen(false);
     setLiveError(false);
+    setMinimized(false);
     setLiveOpen(true);
   }, [streamUrl]);
 
@@ -489,6 +490,7 @@ interface RadioPlayerBarProps {
   togglePlay: () => void;
   closePlayer: () => void;
   audioRef: React.RefObject<HTMLAudioElement>;
+  onMinimize: () => void;
 }
 
 const LIVE_LIKE_KEY = "radio.liked";
@@ -500,6 +502,212 @@ function readStoredLiked(): boolean {
   } catch {
     return false;
   }
+}
+
+function readLikesCount(): number {
+  try {
+    return Math.max(0, Number(window.localStorage.getItem(LIVE_LIKES_METRIC_KEY) || "0"));
+  } catch {
+    return 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Equalizador real da transmissão ao vivo (Web Audio API)
+// ---------------------------------------------------------------------------
+const EQ_BARS = 18;
+const EQ_MAX_HEIGHT = 16;
+
+// O AudioContext e a fonte são compartilhados entre aberturas do player; um
+// <audio> só pode ser conectado a um MediaElementSource uma única vez, por
+// isso guardamos a fonte por elemento num WeakMap.
+let sharedAudioContext: AudioContext | null = null;
+const mediaSourceByElement = new WeakMap<
+  HTMLAudioElement,
+  MediaElementAudioSourceNode
+>();
+
+function getSharedAudioContext(): AudioContext | null {
+  if (sharedAudioContext) {
+    return sharedAudioContext;
+  }
+  const Ctor =
+    window.AudioContext ??
+    (window as Window & { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
+  if (!Ctor) {
+    return null;
+  }
+  try {
+    sharedAudioContext = new Ctor();
+  } catch {
+    sharedAudioContext = null;
+  }
+  return sharedAudioContext;
+}
+
+interface LiveEqualizerProps {
+  audioRef: React.RefObject<HTMLAudioElement>;
+  playing: boolean;
+  /** Quantidade de barras do gráfico. */
+  bars?: number;
+  testId?: string;
+}
+
+/**
+ * Equalizador em tempo real do stream da rádio.
+ *
+ * Quando o navegador suporta Web Audio API, o <audio> é roteado por um
+ * AnalyserNode e as barras acompanham a energia real das frequências
+ * (getByteFrequencyData), atualizada a cada frame — como um equalizador
+ * profissional.
+ *
+ * O gráfico só assume o caminho do áudio quando o AudioContext está
+ * rodando (resume bem-sucedido): se a política de autoplay impedir, a
+ * transmissão continua saindo normalmente pelos alto-falantes e as barras
+ * usam a animação CSS clássica como fallback — o som do ouvinte nunca é
+ * colocado em risco.
+ */
+export function LiveEqualizer({
+  audioRef,
+  playing,
+  bars = EQ_BARS,
+  testId = "live-equalizer",
+}: LiveEqualizerProps) {
+  const barRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const [realTime, setRealTime] = useState(false);
+
+  useEffect(() => {
+    const count = bars;
+    const elements = barRefs.current;
+    const idleHeights = Array.from(
+      { length: count },
+      (_, i) => 3 + ((i * 5) % 6),
+    );
+    const setHeights = (heights: number[]) => {
+      for (let i = 0; i < count; i++) {
+        const el = elements[i];
+        if (el) {
+          el.style.height = `${Math.max(3, Math.round(heights[i]))}px`;
+        }
+      }
+    };
+
+    let analyser: AnalyserNode | null = null;
+    let data: Uint8Array | null = null;
+    let raf = 0;
+    let disposed = false;
+
+    if (playing) {
+      const audio = audioRef.current;
+      const ctx = audio ? getSharedAudioContext() : null;
+      if (audio && ctx) {
+        try {
+          analyser = ctx.createAnalyser();
+          analyser.fftSize = 64;
+          data = new Uint8Array(analyser.frequencyBinCount);
+          const connect = () => {
+            if (disposed || !analyser || !data) {
+              return;
+            }
+            let source = mediaSourceByElement.get(audio);
+            if (!source) {
+              source = ctx.createMediaElementSource(audio);
+              mediaSourceByElement.set(audio, source);
+            }
+            source.connect(analyser);
+            analyser.connect(ctx.destination);
+            setRealTime(true);
+          };
+          if (ctx.state === "running") {
+            connect();
+          } else {
+            void ctx.resume().then(() => {
+              if (!disposed && ctx.state === "running") {
+                connect();
+              }
+            });
+          }
+        } catch {
+          analyser = null;
+        }
+      }
+
+      const smooth = Array.from({ length: count }, () => 3);
+      const tick = () => {
+        if (!disposed && analyser && data) {
+          analyser.getByteFrequencyData(data);
+          for (let i = 0; i < count; i++) {
+            // Bins distribuídos logaritmicamente: graves à esquerda, agudos
+            // à direita — leitura fiel do espectro real da transmissão.
+            const bin = Math.min(
+              data.length - 1,
+              Math.max(0, Math.round(Math.pow(data.length, (i + 1) / count) - 1)),
+            );
+            const target = ((data[bin] ?? 0) / 255) * EQ_MAX_HEIGHT;
+            smooth[i] += (target - smooth[i]) * 0.45;
+          }
+          setHeights(smooth);
+        }
+        if (!disposed) {
+          raf = requestAnimationFrame(tick);
+        }
+      };
+      raf = requestAnimationFrame(tick);
+    } else {
+      setHeights(idleHeights);
+      setRealTime(false);
+    }
+
+    return () => {
+      disposed = true;
+      cancelAnimationFrame(raf);
+      if (analyser) {
+        try {
+          analyser.disconnect();
+        } catch {
+          // Analisador já removido pelo contexto; nada a fazer.
+        }
+      }
+    };
+  }, [audioRef, playing, bars]);
+
+  return (
+    <span
+      data-testid={testId}
+      aria-hidden
+      className={cn(
+        "hidden h-5 items-end gap-[3px] sm:flex",
+        !playing && "opacity-40",
+      )}
+    >
+      {Array.from({ length: bars }).map((_, i) => (
+        <span
+          key={i}
+          ref={(el) => {
+            barRefs.current[i] = el;
+          }}
+          data-testid="equalizer-bar"
+          className={cn(
+            "w-[3px] rounded-full",
+            realTime
+              ? "bg-brand"
+              : playing
+                ? "bg-brand wave-bar"
+                : "bg-neutral-700",
+          )}
+          style={{
+            height:
+              realTime ? "3px" : `${3 + ((i * 7) % 13)}px`,
+            animationDelay:
+              playing && !realTime ? `${i * 0.06}s` : undefined,
+            animationDuration:
+              playing && !realTime ? `${0.7 + ((i * 13) % 9) / 10}s` : undefined,
+          }}
+        />
+      ))}
+    </span>
+  );
 }
 
 /**
@@ -516,9 +724,11 @@ export function RadioPlayerBar({
   togglePlay,
   closePlayer,
   audioRef,
+  onMinimize,
 }: RadioPlayerBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [liked, setLiked] = useState(readStoredLiked);
+  const [likesCount, setLikesCount] = useState(readLikesCount);
   const [requestOpen, setRequestOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -551,10 +761,9 @@ export function RadioPlayerBar({
         window.localStorage.setItem(LIVE_LIKE_KEY, next ? "1" : "0");
         // Métrica simples: total de curtidas registradas neste navegador.
         const total = Number(window.localStorage.getItem(LIVE_LIKES_METRIC_KEY) || "0");
-        window.localStorage.setItem(
-          LIVE_LIKES_METRIC_KEY,
-          String(Math.max(0, total + (next ? 1 : -1))),
-        );
+        const updated = Math.max(0, total + (next ? 1 : -1));
+        window.localStorage.setItem(LIVE_LIKES_METRIC_KEY, String(updated));
+        setLikesCount(updated);
       } catch {
         // Sem armazenamento local, a curtida segue apenas visual.
       }
@@ -613,7 +822,6 @@ export function RadioPlayerBar({
       className="fixed inset-x-0 bottom-0 z-[60] border-t border-white/10 bg-neutral-950/95 text-white shadow-2xl backdrop-blur-md"
     >
       <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-2.5 sm:gap-4">
-        <audio ref={audioRef} src={url} preload="none" />
         <button
           type="button"
           onClick={togglePlay}
@@ -626,22 +834,7 @@ export function RadioPlayerBar({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
-            <span className="hidden h-5 items-end gap-0.5 sm:flex" aria-hidden>
-              {Array.from({ length: 12 }).map((_, i) => (
-                <span
-                  key={i}
-                  className={cn(
-                    "w-1 rounded-full transition-all duration-300",
-                    playing ? "bg-brand wave-bar" : "bg-neutral-700",
-                  )}
-                  style={{
-                    height: playing ? `${6 + ((i * 7) % 14)}px` : "3px",
-                    animationDelay: playing ? `${i * 0.06}s` : undefined,
-                    animationDuration: playing ? `${0.7 + ((i * 13) % 9) / 10}s` : undefined,
-                  }}
-                />
-              ))}
-            </span>
+            <LiveEqualizer audioRef={audioRef} playing={playing} />
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-white">
                 {program.title}
@@ -664,7 +857,7 @@ export function RadioPlayerBar({
           aria-label={liked ? "Descurtir programa" : "Curtir programa"}
           aria-pressed={liked}
           title={liked ? "Descurtir" : "Curtir"}
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-neutral-300 transition-colors hover:text-white"
+          className="flex h-9 min-w-9 flex-shrink-0 items-center justify-center gap-1 rounded-full px-1.5 text-neutral-300 transition-colors hover:text-white"
         >
           <Heart
             className={cn(
@@ -672,9 +865,18 @@ export function RadioPlayerBar({
               liked ? "fill-red-500 text-red-500" : "text-neutral-300",
             )}
           />
+          <span
+            data-testid="likes-count"
+            className="text-[11px] font-semibold tabular-nums"
+          >
+            {likesCount}
+          </span>
         </button>
 
-        <div className="hidden flex-shrink-0 items-center gap-2 md:flex">
+        <div
+          data-testid="live-volume"
+          className="group/vol relative hidden flex-shrink-0 md:block"
+        >
           <button
             type="button"
             onClick={() => setMuted((value) => !value)}
@@ -684,16 +886,20 @@ export function RadioPlayerBar({
           >
             {muted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </button>
-          <input
-            type="range"
-            aria-label="Volume"
-            min={0}
-            max={100}
-            step={1}
-            value={muted ? 0 : Math.round(volume * 100)}
-            onChange={(e) => applyVolume(Number(e.target.value) / 100)}
-            className="h-1 w-20 accent-brand"
-          />
+          {/* Controle vertical acima do alto-falante — só aparece quando o
+              ouvinte vai abaixar/aumentar o volume (hover ou foco). */}
+          <div className="invisible absolute bottom-full left-1/2 mb-3 -translate-x-1/2 rounded-lg border border-white/10 bg-neutral-900 p-2 opacity-0 shadow-2xl transition-all duration-200 group-hover/vol:visible group-hover/vol:opacity-100 group-focus-within/vol:visible group-focus-within/vol:opacity-100">
+            <input
+              type="range"
+              aria-label="Volume da rádio"
+              min={0}
+              max={100}
+              step={1}
+              value={muted ? 0 : Math.round(volume * 100)}
+              onChange={(e) => applyVolume(Number(e.target.value) / 100)}
+              className="volume-slider h-24 w-1.5"
+            />
+          </div>
         </div>
 
         <div className="relative flex-shrink-0">
@@ -735,6 +941,16 @@ export function RadioPlayerBar({
 
         <button
           type="button"
+          onClick={onMinimize}
+          aria-label="Minimizar player"
+          title="Minimizar player"
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-neutral-400 transition-colors hover:text-white"
+        >
+          <Minimize2 className="h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
           onClick={closePlayer}
           aria-label="Fechar player"
           title="Fechar player"
@@ -746,6 +962,99 @@ export function RadioPlayerBar({
 
       {requestOpen && <RequestMusicDialog onClose={() => setRequestOpen(false)} />}
       {shareOpen && <ShareDialog onClose={() => setShareOpen(false)} />}
+    </div>
+  );
+}
+
+interface LiveMiniCardProps {
+  url: string;
+  playing: boolean;
+  error: boolean;
+  togglePlay: () => void;
+  expand: () => void;
+  closePlayer: () => void;
+  audioRef: React.RefObject<HTMLAudioElement>;
+}
+
+/**
+ * Card compacto fixo no canto inferior esquerdo quando a barra da
+ * transmissão ao vivo é minimizada. A reprodução continua: o <audio> do
+ * stream vive no provider e nunca é desmontado ao minimizar.
+ */
+export function LiveMiniCard({
+  url,
+  playing,
+  error,
+  togglePlay,
+  expand,
+  closePlayer,
+  audioRef,
+}: LiveMiniCardProps) {
+  if (!url) {
+    return null;
+  }
+
+  const program = upcomingLive ?? schedule[0];
+
+  return (
+    <div
+      data-testid="live-mini-card"
+      className="fixed bottom-4 left-4 z-[70] flex w-72 max-w-[calc(100vw-2rem)] items-center gap-3 rounded-lg border border-white/10 bg-neutral-950/95 p-3 text-white shadow-2xl backdrop-blur-md"
+    >
+      <LiveEqualizer
+        audioRef={audioRef}
+        playing={playing}
+        bars={10}
+        testId="mini-equalizer"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-bold">{program.title}</p>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 text-[10px] font-semibold uppercase",
+            playing ? "text-live" : "text-neutral-400",
+          )}
+        >
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              playing ? "animate-pulse bg-live" : "bg-neutral-600",
+            )}
+          />
+          {error ? "Sem sinal" : playing ? "Ao vivo" : "Pausado"}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={togglePlay}
+        aria-label={playing ? "Pausar transmissão" : "Reproduzir transmissão"}
+        aria-pressed={playing}
+        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground transition-colors hover:bg-accent"
+      >
+        {playing ? (
+          <Pause className="h-4 w-4 fill-current" />
+        ) : (
+          <Play className="h-4 w-4 translate-x-0.5 fill-current" />
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={expand}
+        aria-label="Expandir player"
+        title="Expandir player"
+        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <Maximize2 className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={closePlayer}
+        aria-label="Fechar player"
+        title="Fechar player"
+        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

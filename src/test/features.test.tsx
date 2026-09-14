@@ -57,8 +57,11 @@ describe("RadioPlayer — player global no cabeçalho", () => {
 
     const bar = await screen.findByTestId("radio-player-bar");
     expect(bar).toBeInTheDocument();
-    const audio = bar.querySelector("audio");
-    expect(audio).toHaveAttribute("src", "https://stream.example.com/live");
+    // O <audio> do stream vive no provider (persistente ao minimizar).
+    expect(screen.getByTestId("live-audio")).toHaveAttribute(
+      "src",
+      "https://stream.example.com/live",
+    );
   });
 });
 
@@ -76,6 +79,7 @@ describe("RadioPlayer — barra do player", () => {
         togglePlay={togglePlay}
         closePlayer={closePlayer}
         audioRef={createRef<HTMLAudioElement>()}
+        onMinimize={vi.fn()}
       />,
     );
 
@@ -94,6 +98,7 @@ describe("RadioPlayer — barra do player", () => {
         togglePlay={togglePlay}
         closePlayer={closePlayer}
         audioRef={createRef<HTMLAudioElement>()}
+        onMinimize={vi.fn()}
       />,
     );
 
@@ -112,6 +117,7 @@ describe("RadioPlayer — barra do player", () => {
         togglePlay={vi.fn()}
         closePlayer={vi.fn()}
         audioRef={createRef<HTMLAudioElement>()}
+        onMinimize={vi.fn()}
       />,
     );
 
@@ -126,6 +132,7 @@ describe("RadioPlayer — barra do player", () => {
         togglePlay={vi.fn()}
         closePlayer={vi.fn()}
         audioRef={createRef<HTMLAudioElement>()}
+        onMinimize={vi.fn()}
       />,
     );
 
@@ -171,6 +178,7 @@ describe("RadioPlayer — barra ao vivo compacta (estilo Spotify)", () => {
         togglePlay={vi.fn()}
         closePlayer={vi.fn()}
         audioRef={createRef<HTMLAudioElement>()}
+        onMinimize={vi.fn()}
       />,
     );
 
@@ -198,6 +206,77 @@ describe("RadioPlayer — barra ao vivo compacta (estilo Spotify)", () => {
       screen.getByRole("button", { name: /Curtir programa/i }),
     ).toBeInTheDocument();
     expect(window.localStorage.getItem("radio.likes.total")).toBe("0");
+  });
+
+  it("mostra a quantidade de curtidas ao lado do coração e atualiza ao curtir", () => {
+    window.localStorage.setItem("radio.likes.total", "42");
+    renderBar();
+
+    expect(screen.getByTestId("likes-count")).toHaveTextContent("42");
+
+    fireEvent.click(screen.getByRole("button", { name: /Curtir programa/i }));
+    expect(screen.getByTestId("likes-count")).toHaveTextContent("43");
+
+    fireEvent.click(screen.getByRole("button", { name: /Descurtir programa/i }));
+    expect(screen.getByTestId("likes-count")).toHaveTextContent("42");
+  });
+
+  it("o equalizador se anima na cor da marca enquanto a transmissão toca", () => {
+    const { rerender } = render(
+      <RadioPlayerBar
+        url="https://stream.example.com/live"
+        open
+        playing={false}
+        error={false}
+        togglePlay={vi.fn()}
+        closePlayer={vi.fn()}
+        audioRef={createRef<HTMLAudioElement>()}
+        onMinimize={vi.fn()}
+      />,
+    );
+
+    const eq = screen.getByTestId("live-equalizer");
+    const bars = within(eq).getAllByTestId("equalizer-bar");
+    expect(bars.length).toBeGreaterThan(10);
+    // Sem sinal: barras neutras e paradas.
+    expect(bars.every((bar) => bar.className.includes("bg-neutral-700"))).toBe(true);
+
+    rerender(
+      <RadioPlayerBar
+        url="https://stream.example.com/live"
+        open
+        playing
+        error={false}
+        togglePlay={vi.fn()}
+        closePlayer={vi.fn()}
+        audioRef={createRef<HTMLAudioElement>()}
+        onMinimize={vi.fn()}
+      />,
+    );
+
+    // Tocando: o equalizador ganha a cor da marca e a animação de onda
+    // (fallback visual quando o ambiente não expõe Web Audio API).
+    const animated = within(screen.getByTestId("live-equalizer")).getAllByTestId(
+      "equalizer-bar",
+    );
+    expect(animated[0]).toHaveClass("wave-bar");
+  });
+
+  it("o volume é vertical acima do alto-falante e só aparece ao interagir", () => {
+    renderBar();
+
+    const group = screen.getByTestId("live-volume");
+    expect(group).toHaveClass("group/vol");
+
+    const slider = within(group).getByRole("slider", { name: /Volume da rádio/i });
+    // Vai de baixo para cima (vertical) e não mais ao lado do ícone.
+    expect(slider).toHaveClass("volume-slider");
+    expect(slider.closest(".absolute")).not.toBeNull();
+
+    // Escondido por padrão; o grupo revela no hover ou no foco do teclado.
+    const popover = slider.closest(".absolute") as HTMLElement;
+    expect(popover).toHaveClass("invisible");
+    expect(popover).toHaveClass("group-hover/vol:visible");
   });
 
   it("o menu de três pontos reúne pedir música, WhatsApp e compartilhar", () => {
@@ -323,10 +402,40 @@ describe("RadioPlayer — 'Ouça a Rádio' no cabeçalho", () => {
 
     // O estado "tocando" vem do evento real do <audio> — simula para validar
     // que o cabeçalho passa a indicar "Ao vivo".
-    const audio = bar.querySelector("audio");
-    expect(audio).not.toBeNull();
-    fireEvent(audio as Element, new Event("play"));
+    const audio = screen.getByTestId("live-audio");
+    fireEvent(audio, new Event("play"));
     expect(within(header).getByText("Ao vivo")).toBeInTheDocument();
+  });
+});
+
+describe("RadioPlayer — minimizar a transmissão ao vivo", () => {
+  it("minimiza a barra em um card compacto no canto inferior esquerdo mantendo o áudio montado", async () => {
+    vi.stubEnv("VITE_RADIO_STREAM_URL", "https://stream.example.com/live");
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Ouça a Rádio/i }));
+    await screen.findByTestId("radio-player-bar");
+
+    const audio = screen.getByTestId("live-audio");
+    const pauseSpy = vi.spyOn(audio, "pause");
+
+    fireEvent.click(screen.getByRole("button", { name: /Minimizar player/i }));
+
+    // A barra cede lugar ao card fixo no canto inferior esquerdo.
+    expect(screen.queryByTestId("radio-player-bar")).not.toBeInTheDocument();
+    const card = screen.getByTestId("live-mini-card");
+    expect(card.className).toContain("bottom-4");
+    expect(card.className).toContain("left-4");
+
+    // O <audio> segue vivo no provider e a minimização não pausou a rádio.
+    expect(screen.getByTestId("live-audio")).toBeInTheDocument();
+    expect(pauseSpy).not.toHaveBeenCalled();
+
+    // Expandir restaura a barra completa.
+    fireEvent.click(screen.getByRole("button", { name: /Expandir player/i }));
+    expect(screen.getByTestId("radio-player-bar")).toBeInTheDocument();
+    expect(screen.queryByTestId("live-mini-card")).not.toBeInTheDocument();
   });
 });
 
