@@ -299,18 +299,22 @@ function DialogShell({ testId, ariaLabel, kicker, title, onClose, children }: Di
 interface SocialBarProps {
   publicationId: string;
   title: string;
+  /** Esconde a barra visualmente (ex.: após curtir/comentar) mas mantém
+      os diálogos montados para que o usuário veja o que acabou de fazer. */
+  hidden?: boolean;
 }
 
-export function SocialBar({ publicationId, title }: SocialBarProps) {
+export function SocialBar({ publicationId, title, hidden }: SocialBarProps) {
   const social = useSocialItem(publicationId);
   const [dialog, setDialog] = useState<"comments" | "share" | "invite" | null>(null);
 
   return (
     <>
-      <div
-        data-testid="social-bar"
-        className="absolute bottom-20 left-4 z-20 flex items-center gap-1 rounded-full border border-white/10 bg-black/50 px-2 py-1.5 shadow-2xl backdrop-blur-md lg:bottom-24"
-      >
+      {!hidden && (
+        <div
+          data-testid="social-bar"
+          className="absolute bottom-20 right-4 z-20 flex items-center gap-1 rounded-full border border-white/10 bg-black/50 px-2 py-1.5 shadow-2xl backdrop-blur-md lg:bottom-24 lg:right-6"
+        >
         <SocialIconButton
           label={social.liked ? "Descurtir publicação" : "Curtir publicação"}
           pressed={social.liked}
@@ -331,6 +335,7 @@ export function SocialBar({ publicationId, title }: SocialBarProps) {
           <span className="text-[11px] font-semibold">Convidar</span>
         </SocialIconButton>
       </div>
+      )}
 
       {dialog === "comments" && <CommentDialog publicationId={publicationId} title={title} onClose={() => setDialog(null)} />}
       {dialog === "share" && (

@@ -89,6 +89,8 @@ export interface NowPlaying {
 
 const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 1.75, 2];
 const SEEK_STEP_SECONDS = 15;
+/** Preferência de volume do conteúdo (podcast/vídeo) persistida no navegador. */
+const NOW_PLAYING_VOLUME_KEY = "radio.content.volume";
 
 export interface RadioPlayerApi {
   streamUrl: string;
@@ -149,7 +151,15 @@ export function useRadioPlayer(): RadioPlayerApi {
 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
+  const [volume, setVolume] = useState<number>(
+    () => {
+      // Preferência de volume do conteúdo (podcast/vídeo) salva no navegador.
+      const raw = window.localStorage.getItem(NOW_PLAYING_VOLUME_KEY);
+      if (raw === null || raw === "") return 1;
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : 1;
+    },
+  );
   const [muted, setMuted] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
 
@@ -384,10 +394,14 @@ export function useRadioPlayer(): RadioPlayerApi {
   }, [currentMedia]);
 
   const toggleMute = useCallback(() => setMuted((value) => !value), []);
-  const changeVolume = useCallback(
-    (value: number) => setVolume(Math.max(0, Math.min(1, value))),
-    [],
-  );
+  const changeVolume = useCallback((value: number) => {
+    const next = Math.max(0, Math.min(1, value));
+    setVolume(next);
+    // Volume zero = mudo; qualquer outro valor restaura o som.  Mantém
+    // consistência com o player de vídeo (YouTubePlayer.onVolumeInput).
+    setMuted(next === 0);
+    window.localStorage.setItem(NOW_PLAYING_VOLUME_KEY, String(next));
+  }, []);
 
   const cyclePlaybackRate = useCallback(() => {
     setPlaybackRate((rate) => {
@@ -1318,112 +1332,120 @@ export function NowPlayingBar({
 }: NowPlayingBarProps) {
   const social = useSocialItem(nowPlaying.id);
   const [socialDialog, setSocialDialog] = useState<"comments" | "share" | "invite" | null>(null);
+  // Painel de volume vertical abre apenas quando o visitante clica no alto-falante.
+  const [volumeOpen, setVolumeOpen] = useState(false);
 
   return (
     <div
       data-testid="now-playing-bar"
       className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-card/95 shadow-2xl backdrop-blur-md"
     >
-      <div className="container flex items-center gap-3 px-4 py-3 sm:gap-4">
-        <img
-          src={nowPlaying.imageUrl}
-          alt=""
-          className="h-12 w-12 flex-shrink-0 rounded-md object-cover"
-        />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-foreground">{nowPlaying.title}</p>
-          <p className="truncate text-xs text-muted-foreground">{nowPlaying.subtitle}</p>
-          <div className="mt-1 flex items-center gap-2">
-            <span className="text-[10px] tabular-nums text-muted-foreground">
-              {Math.floor(currentTime / 60)}:{String(Math.floor(currentTime % 60)).padStart(2, "0")}
-            </span>
-            <input
-              type="range"
-              aria-label="Progresso do episódio"
-              min={0}
-              max={duration || 100}
-              step={1}
-              value={Math.min(currentTime, duration || 100)}
-              onChange={(e) => onSeekTo(Number(e.target.value))}
-              className="range-brand h-1 w-full"
-            />
-            <span className="text-[10px] tabular-nums text-muted-foreground">
-              {Math.floor(duration / 60)}:{String(Math.floor(duration % 60)).padStart(2, "0")}
-            </span>
+      {/* Grade de três colunas: informações à esquerda, transporte ao centro
+          e ações à direita. A timeline vive no rodapé, fora da grade. */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 pt-3.5 sm:gap-6 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3 justify-self-start">
+          <img
+            src={nowPlaying.imageUrl}
+            alt=""
+            className="h-12 w-12 flex-shrink-0 rounded-md object-cover sm:h-14 sm:w-14"
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-foreground">{nowPlaying.title}</p>
+            <p className="truncate text-xs text-muted-foreground">{nowPlaying.subtitle}</p>
           </div>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
-          <button
-            type="button"
-            onClick={onSeekBackward}
-            aria-label="Voltar 15 segundos"
-            title="Voltar 15 segundos"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground sm:h-9 sm:w-9"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
+
+        {/* Transporte centralizado: na ordem Play/Pausa → Voltar 15s →
+            Avançar 15s (o "voltar" vem logo depois do play, antes do avançar). */}
+        <div className="flex items-center gap-1 justify-self-center sm:gap-2">
           {hasQueue && (
-            <>
-              <button
-                type="button"
-                onClick={onPrevious}
-                aria-label="Episódio anterior"
-                className="hidden h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground md:flex"
-              >
-                <SkipBack className="h-4 w-4 fill-current" />
-              </button>
-              <button
-                type="button"
-                onClick={onNext}
-                aria-label="Próximo episódio"
-                className="hidden h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground md:flex"
-              >
-                <SkipForward className="h-4 w-4 fill-current" />
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={onPrevious}
+              aria-label="Episódio anterior"
+              title="Episódio anterior"
+              className="hidden h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground md:flex"
+            >
+              <SkipBack className="h-4 w-4 fill-current" />
+            </button>
           )}
           <button
             type="button"
             onClick={onTogglePlay}
             aria-label={playing ? "Pausar podcast" : "Reproduzir podcast"}
             aria-pressed={playing}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-colors hover:bg-accent"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-colors hover:bg-accent sm:h-11 sm:w-11"
           >
-            {playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 translate-x-0.5 fill-current" />}
+            {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 translate-x-0.5 fill-current" />}
+          </button>
+          <button
+            type="button"
+            onClick={onSeekBackward}
+            aria-label="Voltar 15 segundos"
+            title="Voltar 15 segundos"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ChevronLeft className="h-5 w-5" />
           </button>
           <button
             type="button"
             onClick={onSeekForward}
             aria-label="Avançar 15 segundos"
             title="Avançar 15 segundos"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground sm:h-9 sm:w-9"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onToggleMute}
-            aria-label={muted ? "Ativar som" : "Silenciar"}
-            aria-pressed={muted}
-            title={muted ? "Ativar som" : "Silenciar"}
             className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
           >
-            {muted || volume === 0 ? (
-              <VolumeX className="h-4 w-4" />
-            ) : (
-              <Volume2 className="h-4 w-4" />
-            )}
+            <ChevronRight className="h-5 w-5" />
           </button>
-          <input
-            type="range"
-            aria-label="Volume"
-            min={0}
-            max={100}
-            step={1}
-            value={Math.round(volume * 100)}
-            onChange={(e) => onVolumeChange(Number(e.target.value) / 100)}
-            className="range-brand hidden h-1 w-16 sm:block"
-          />
+          {hasQueue && (
+            <button
+              type="button"
+              onClick={onNext}
+              aria-label="Próximo episódio"
+              title="Próximo episódio"
+              className="hidden h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground md:flex"
+            >
+              <SkipForward className="h-4 w-4 fill-current" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-shrink-0 items-center gap-1 justify-self-end sm:gap-2">
+          {/* Volume vertical: o painel abre ao clicar no alto-falante. */}
+          <div className="relative flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setVolumeOpen((value) => !value)}
+              aria-label={muted || volume === 0 ? "Ativar som" : "Silenciar"}
+              aria-pressed={muted || volume === 0}
+              aria-expanded={volumeOpen}
+              title={muted || volume === 0 ? "Ativar som" : "Silenciar"}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {muted || volume === 0 ? (
+                <VolumeX className="h-4 w-4" />
+              ) : (
+                <Volume2 className="h-4 w-4" />
+              )}
+            </button>
+            {volumeOpen && (
+              <div
+                data-testid="podcast-volume-popover"
+                className="absolute bottom-full right-0 z-[70] mb-3 rounded-lg border border-border bg-card p-2 shadow-2xl"
+              >
+                <input
+                  type="range"
+                  aria-label="Volume do podcast"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={muted ? 0 : Math.round(volume * 100)}
+                  onChange={(e) => onVolumeChange(Number(e.target.value) / 100)}
+                  className="volume-slider h-24 w-1.5"
+                />
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={onCycleRate}
@@ -1513,6 +1535,26 @@ export function NowPlayingBar({
             <X className="h-4 w-4" />
           </button>
         </div>
+      </div>
+
+      {/* Timeline no rodapé da barra (não fica presa no meio da tela). */}
+      <div className="flex items-center gap-2 border-t border-border/60 px-4 py-2.5 sm:px-6">
+        <span className="flex-shrink-0 text-[10px] tabular-nums text-muted-foreground">
+          {Math.floor(currentTime / 60)}:{String(Math.floor(currentTime % 60)).padStart(2, "0")}
+        </span>
+        <input
+          type="range"
+          aria-label="Progresso do episódio"
+          min={0}
+          max={duration || 100}
+          step={1}
+          value={Math.min(currentTime, duration || 100)}
+          onChange={(e) => onSeekTo(Number(e.target.value))}
+          className="range-brand h-1.5 w-full"
+        />
+        <span className="flex-shrink-0 text-[10px] tabular-nums text-muted-foreground">
+          {Math.floor(duration / 60)}:{String(Math.floor(duration % 60)).padStart(2, "0")}
+        </span>
       </div>
 
       {/* Diálogos sociais do episódio (portados ao <body> pelo próprio

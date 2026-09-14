@@ -3,7 +3,25 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { Layout } from "@/components/Layout";
 import { articles } from "@/data/articles";
-import { Facebook, Twitter, Linkedin, MessageCircle, Share2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Facebook,
+  Linkedin,
+  MessageCircle,
+  Radio,
+  Send,
+  Share2,
+  Twitter,
+} from "lucide-react";
+import {
+  formatPlace,
+  formatPublishedAt,
+  formatUpdatedAt,
+} from "@/lib/relative-time";
+
+// Links de adesão da redação — troque pelas URLs reais do grupo e do canal.
+const WHATSAPP_GROUP_URL = "https://chat.whatsapp.com/SEU-GRUPO-VITORIA-NEWS";
+const TELEGRAM_CHANNEL_URL = "https://t.me/seu_canal_vitorianews";
 
 function buildShareLinks(url: string, title: string) {
   const encodedUrl = encodeURIComponent(url);
@@ -38,10 +56,10 @@ const ArticlePage = () => {
 
   useEffect(() => {
     if (article) {
-      document.title = `${article.title} — Web Rádio Vitória`;
+      document.title = `${article.title} — Vitória News`;
     }
     return () => {
-      document.title = "Web Rádio Vitória — Notícias, Política, Tecnologia e Entretenimento";
+      document.title = "Vitória News — Notícias, Política, Tecnologia e Entretenimento";
     };
   }, [article]);
 
@@ -59,17 +77,56 @@ const ArticlePage = () => {
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
   const shareLinks = buildShareLinks(shareUrl, article.title);
 
+  // No rodapé da matéria: jornalista, tempo relativo da publicação (e da
+  // atualização, quando houver) e o local de apuração (cidade/UF).
+  const published = formatPublishedAt(article.publishedAt);
+  const updated = article.updatedAt ? formatUpdatedAt(article.updatedAt) : "";
+  const place = formatPlace(article.city, article.state);
+
   return (
     <Layout>
       <article className="container max-w-4xl py-12 md:py-16">
-        <span className="text-xs font-bold uppercase tracking-wider text-section-label">{article.category}</span>
+        {/* Marca do portal (padrão Globo/Metrópoles): nome com logo à esquerda. */}
+        <div className="mb-8 flex items-center gap-3 border-b border-border pb-4">
+          <Link to="/" className="inline-flex items-center gap-2.5">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-sm bg-brand text-brand-foreground shadow-brand">
+              <Radio className="h-5 w-5" />
+            </span>
+            <span>
+              <strong className="block font-serif text-lg leading-none text-foreground">Vitória News</strong>
+              <small className="block text-[10px] uppercase tracking-widest text-muted-foreground">Notícias com apuração</small>
+            </span>
+          </Link>
+        </div>
+
+        <Link
+          to="/noticias"
+          className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Voltar para Notícias
+        </Link>
+
+        <span className="mt-6 block text-xs font-bold uppercase tracking-wider text-section-label">{article.category}</span>
         <h1 className="mt-3 max-w-3xl font-serif text-3xl font-bold leading-tight text-foreground md:text-5xl">{article.title}</h1>
         <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted-foreground">{article.excerpt}</p>
 
-        <div className="mb-8 mt-6 flex flex-wrap items-center gap-3 border-y border-border py-4 text-sm text-muted-foreground">
+        <div className="mb-8 mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 border-y border-border py-4 text-sm text-muted-foreground">
           <span>Por <strong className="text-foreground">{article.author}</strong></span>
-          <span>•</span>
-          <time>{new Date(article.date).toLocaleDateString("pt-BR", { year: "numeric", month: "long", day: "numeric" })}</time>
+          <span aria-hidden="true">•</span>
+          <time>{published}</time>
+          {updated && (
+            <>
+              <span aria-hidden="true">•</span>
+              <time>{updated}</time>
+            </>
+          )}
+          {place && (
+            <>
+              <span aria-hidden="true">•</span>
+              <span>{place}</span>
+            </>
+          )}
         </div>
 
         <div className="mb-10 aspect-video overflow-hidden rounded-md border border-border">
@@ -118,6 +175,38 @@ const ArticlePage = () => {
             >
               <Share2 size={18} />
             </button>
+          </div>
+
+          {/* Mini banner de adesão: grupo do WhatsApp e canal do Telegram. */}
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <a
+              href={WHATSAPP_GROUP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded-lg border border-[#25D366]/40 bg-[#25D366]/10 p-4 transition-colors hover:bg-[#25D366]/20"
+            >
+              <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full bg-[#25D366] text-white">
+                <MessageCircle className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-foreground">Grupo no WhatsApp</span>
+                <span className="block truncate text-xs text-muted-foreground">Receba as notícias em primeira mão.</span>
+              </span>
+            </a>
+            <a
+              href={TELEGRAM_CHANNEL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded-lg border border-[#229ED9]/40 bg-[#229ED9]/10 p-4 transition-colors hover:bg-[#229ED9]/20"
+            >
+              <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full bg-[#229ED9] text-white">
+                <Send className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-foreground">Canal no Telegram</span>
+                <span className="block truncate text-xs text-muted-foreground">Participe das conversas da redação.</span>
+              </span>
+            </a>
           </div>
         </div>
       </article>

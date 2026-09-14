@@ -63,14 +63,15 @@ describe("Ferramentas sociais — barra horizontal (YouTube fullscreen)", () => 
       expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
     });
 
-    const like = screen.getByRole("button", { name: "Curtir publicação" });
-    fireEvent.click(like);
-    expect(screen.getByRole("button", { name: "Descurtir publicação" })).toBeInTheDocument();
-    expect(screen.getByTestId("social-likes-count").textContent).toBe("1");
-
-    fireEvent.click(screen.getByRole("button", { name: "Descurtir publicação" }));
-    expect(screen.getByRole("button", { name: "Curtir publicação" })).toBeInTheDocument();
-    expect(screen.getByTestId("social-likes-count").textContent).toBe("");
+    // Clica em curtir → a barra some (hideSocialBar) e a curtida persiste no localStorage.
+    fireEvent.click(screen.getByRole("button", { name: "Curtir publicação" }));
+    // A barra social some porque o usuário já curtiu.
+    await waitFor(() => {
+      expect(screen.queryByTestId("social-bar")).not.toBeInTheDocument();
+    });
+    // Estado persistido no localStorage.
+    expect(window.localStorage.getItem(`social.liked.${video.id}`)).toBe("1");
+    expect(window.localStorage.getItem(`social.likes.total.${video.id}`)).toBe("1");
   });
 });
 
@@ -119,7 +120,11 @@ describe("Ferramentas sociais — conversas e convites", () => {
       { target: { value: "Que conteúdo incrível!" } },
     );
     fireEvent.click(screen.getByRole("button", { name: "Publicar comentário" }));
-    expect(screen.getByText("Que conteúdo incrível!")).toBeInTheDocument();
+    // O diálogo permanece aberto mesmo depois que a barra some (hidden).
+    // Aguarda a re-renderização assíncrona do hook useSocialItem.
+    await waitFor(() => {
+      expect(screen.getByText("Que conteúdo incrível!")).toBeInTheDocument();
+    });
   });
 
   it("abre o diálogo de convite; cada convite vira evento na fila", async () => {

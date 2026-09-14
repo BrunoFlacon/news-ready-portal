@@ -113,3 +113,18 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/*
+ * Título das matérias (padrão editorial tipo Globo/Metrópoles):
+ * títulos enormes e compactos a partir do tablet, com a coluna de leitura
+ * limitada a 48rem — os valores sobrescrevem os tokens utilitários.
+ */
+@media (min-width: 768px) {
+  .md\:text-5xl {
+    font-size: 2.7rem;
+    line-height: 1;
+  }
+}
+.max-w-3xl {
+  max-width: 48rem;
+}

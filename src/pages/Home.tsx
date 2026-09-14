@@ -18,7 +18,7 @@ import { MediaRail } from "@/components/MediaRail";
 import { YouTubePlayer } from "@/components/YouTubePlayer";
 import { Button } from "@/components/ui/button";
 import { SocialBar, SocialRail } from "@/components/SocialDialogs";
-import { trackView } from "@/lib/social";
+import { trackView, useSocialItem } from "@/lib/social";
 import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
 import { extractPalette, type AmbientPalette } from "@/lib/ambient";
 import { podcasts } from "@/data/podcasts";
@@ -97,6 +97,11 @@ function WatchOverlay({
   const next = phase === "transition" ? watch.next : null;
   const vertical = item.orientation === "vertical";
 
+  // Barra horizontal some depois que o visitante curte ou comenta o conteúdo;
+  // no rail vertical o comportamento permanece (sempre sobre o vídeo).
+  const social = useSocialItem(item.id);
+  const hideSocialBar = social.liked || social.comments.length > 0;
+
   // Tempo de visualização: acumula o tempo em exibição por publicação
   // (métrica "view" — v0 sem banco; pronta para sincronização futura).
   useEffect(() => {
@@ -122,18 +127,23 @@ function WatchOverlay({
           <div className="ambient-blob ambient-blob-2 bottom-[-20%] right-[-10%] h-[80%] w-[70%]" style={{ background: ambient.b }} />
           <div className="ambient-dim" />
 
-          {/* O vídeo ocupa o banner inteiro com o player estilo YouTube */}
+          {/* O vídeo ocupa o banner inteiro com o player estilo YouTube. O
+              wrapper `relative` existe para o rail vertical (reels/stories)
+              ficar colado à borda direita do VÍDEO — e não da tela. */}
           <div className="absolute inset-0 z-10 flex items-center justify-center">
-            <YouTubePlayer
-              src={item.videoUrl}
-              poster={item.image}
-              caption={item.caption}
-              orientation={item.orientation}
-              cc={cc}
-              showControls={uiVisible}
-              onToggleCc={onToggleCc}
-              onEnded={onEnded}
-            />
+            <div className="relative">
+              <YouTubePlayer
+                src={item.videoUrl}
+                poster={item.image}
+                caption={item.caption}
+                orientation={item.orientation}
+                cc={cc}
+                showControls={uiVisible}
+                onToggleCc={onToggleCc}
+                onEnded={onEnded}
+              />
+              {vertical && <SocialRail publicationId={item.id} title={item.title} />}
+            </div>
           </div>
 
           {/* Tarja do tipo no canto superior esquerdo (AO VIVO sempre visível) */}
@@ -185,13 +195,12 @@ function WatchOverlay({
             {next && <p className="mt-2 text-xs font-bold text-brand">A seguir: {next.title}</p>}
           </div>
 
-          {/* Ferramentas sociais: barra horizontal (lives/vídeos/imagens
-              horizontais) ou rail vertical (reels/stories), com curtir,
-              comentar, compartilhar e convidar amigos para assinar. */}
-          {vertical ? (
-            <SocialRail publicationId={item.id} title={item.title} />
-          ) : (
-            <SocialBar publicationId={item.id} title={item.title} />
+          {/* Ferramentas sociais: no formato horizontal a barra fica no canto
+              direito e some depois que o visitante curte ou comenta; no
+              formato vertical o rail vive dentro do wrapper do vídeo
+              (colado à borda direita do player). */}
+          {!vertical && (
+            <SocialBar publicationId={item.id} title={item.title} hidden={hideSocialBar} />
           )}
         </>
       )}

@@ -588,12 +588,20 @@ describe("Podcast — controles da barra inferior", () => {
     );
     const audio = screen.getByTestId("np-audio") as HTMLAudioElement;
 
+    // Clicar no alto-falante abre o painel vertical de volume (não muta direto).
     fireEvent.click(screen.getByRole("button", { name: /Silenciar/i }));
+    expect(screen.getByTestId("podcast-volume-popover")).toBeInTheDocument();
+
+    // Deslizar até 0% silencia a mídia.
+    const slider = screen.getByRole("slider", { name: /Volume do podcast/i });
+    fireEvent.change(slider, { target: { value: "0" } });
     expect(audio.muted).toBe(true);
     expect(screen.getByRole("button", { name: /Ativar som/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Ativar som/i }));
+    // Subir o volume restaura o som e o rótulo volta a ser "Silenciar".
+    fireEvent.change(slider, { target: { value: "50" } });
     expect(audio.muted).toBe(false);
+    expect(screen.getByRole("button", { name: /Silenciar/i })).toBeInTheDocument();
   });
 
   it("altera a velocidade de reprodução em ciclo e aplica na mídia", () => {
