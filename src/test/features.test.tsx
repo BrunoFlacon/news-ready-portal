@@ -604,7 +604,7 @@ describe("Podcast — controles da barra inferior", () => {
     expect(screen.getByRole("button", { name: /Silenciar/i })).toBeInTheDocument();
   });
 
-  it("altera a velocidade de reprodução em ciclo e aplica na mídia", () => {
+  it("abre o menu de velocidade e aplica a taxa escolhida na mídia", () => {
     mockMedia();
     renderWithProviders(<Home />);
 
@@ -618,12 +618,42 @@ describe("Podcast — controles da barra inferior", () => {
     });
     expect(rateButton).toHaveTextContent("1×");
 
+    // Botão compacto: abre o menu com as opções em vez de ciclar.
     fireEvent.click(rateButton);
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /1\.25x/i }));
 
+    expect(audio.playbackRate).toBe(1.25);
     expect(
       screen.getByRole("button", { name: /Velocidade de reprodução/i }),
     ).toHaveTextContent("1.25×");
-    expect(audio.playbackRate).toBe(1.25);
+  });
+
+  it("segue o padrão YouTube/Spotify: voltar 15s à esquerda do play e avançar à direita", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Reproduzir podcast/i })[0],
+    );
+
+    const transport = screen.getByTestId("np-transport");
+    const labels = within(transport)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label"));
+
+    const backIndex = labels.indexOf("Voltar 15 segundos");
+    const playIndex = labels.findIndex(
+      (label) =>
+        label === "Reproduzir podcast" || label === "Pausar podcast",
+    );
+    const forwardIndex = labels.indexOf("Avançar 15 segundos");
+    const speedIndex = labels.indexOf("Velocidade de reprodução");
+
+    expect(backIndex).toBeGreaterThanOrEqual(0);
+    expect(playIndex).toBeGreaterThan(backIndex);
+    expect(forwardIndex).toBeGreaterThan(playIndex);
+    // Seletor de velocidade compacto fica no centro, logo após o avançar.
+    expect(speedIndex).toBeGreaterThan(forwardIndex);
   });
 
   it("avança e volta 15 segundos no episódio", () => {

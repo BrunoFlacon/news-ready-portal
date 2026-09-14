@@ -19,9 +19,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
-  Gauge,
   Headphones,
   Heart,
   Link2,
@@ -121,7 +121,7 @@ export interface RadioPlayerApi {
   seekForward: () => void;
   toggleMute: () => void;
   changeVolume: (volume: number) => void;
-  cyclePlaybackRate: () => void;
+  setPlaybackRate: (rate: number) => void;
   minimize: () => void;
   expand: () => void;
   closeNowPlaying: () => void;
@@ -161,7 +161,7 @@ export function useRadioPlayer(): RadioPlayerApi {
     },
   );
   const [muted, setMuted] = useState(false);
-  const [playbackRate, setPlaybackRate] = useState(1);
+  const [playbackRate, setPlaybackRateState] = useState(1);
 
   const openPlayer = useCallback(() => {
     if (!streamUrl) {
@@ -403,11 +403,12 @@ export function useRadioPlayer(): RadioPlayerApi {
     window.localStorage.setItem(NOW_PLAYING_VOLUME_KEY, String(next));
   }, []);
 
-  const cyclePlaybackRate = useCallback(() => {
-    setPlaybackRate((rate) => {
-      const next = PLAYBACK_RATES[(PLAYBACK_RATES.indexOf(rate) + 1) % PLAYBACK_RATES.length];
-      return next;
-    });
+  // Taxa de reprodução: aceita qualquer um dos passos de PLAYBACK_RATES.
+  const setPlaybackRate = useCallback((rate: number) => {
+    if (!PLAYBACK_RATES.includes(rate)) {
+      return;
+    }
+    setPlaybackRateState(rate);
   }, []);
 
   const handleMediaEnded = useCallback(() => {
@@ -488,7 +489,7 @@ export function useRadioPlayer(): RadioPlayerApi {
     seekForward,
     toggleMute,
     changeVolume,
-    cyclePlaybackRate,
+    setPlaybackRate,
     minimize,
     expand,
     closeNowPlaying,
@@ -1286,6 +1287,61 @@ export function ShareDialog({ onClose }: ShareDialogProps) {
   );
 }
 
+interface PlaybackRateMenuProps {
+  rate: number;
+  onSelect: (rate: number) => void;
+}
+
+/**
+ * Seletor de velocidade compacto para o player de podcast: mostra apenas a
+ * taxa atual ("1×") e abre um menu vertical com PLAYBACK_RATES ao tocar.
+ * Usado no NowPlayingBar e no VideoBubble (padrão YouTube Music).
+ */
+function PlaybackRateMenu({ rate, onSelect }: PlaybackRateMenuProps) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative flex-shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-label="Velocidade de reprodução"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Velocidade de reprodução"
+        className="flex h-8 items-center rounded-full bg-secondary px-2 text-[11px] font-bold text-muted-foreground transition-colors hover:text-foreground sm:h-9"
+      >
+        {rate}×
+      </button>
+      {open && (
+        <div
+          data-testid="playback-rate-menu"
+          role="menu"
+          aria-label="Velocidade de reprodução"
+          className="absolute bottom-full left-0 mb-2 w-28 rounded-lg border border-border bg-card py-1 shadow-2xl"
+        >
+          {PLAYBACK_RATES.map((step) => (
+            <button
+              key={step}
+              type="button"
+              role="menuitemradio"
+              aria-checked={rate === step}
+              onClick={() => {
+                onSelect(step);
+                setOpen(false);
+              }}
+              className="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <span>{step}x</span>
+              {rate === step && <Check className="h-3.5 w-3.5 text-brand" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface NowPlayingBarProps {
   nowPlaying: NowPlaying;
   playing: boolean;
@@ -1299,7 +1355,7 @@ interface NowPlayingBarProps {
   onSeekForward: () => void;
   onToggleMute: () => void;
   onVolumeChange: (volume: number) => void;
-  onCycleRate: () => void;
+  onSetPlaybackRate: (rate: number) => void;
   hasQueue: boolean;
   onPrevious?: () => void;
   onNext?: () => void;
@@ -1322,7 +1378,7 @@ export function NowPlayingBar({
   onSeekForward,
   onToggleMute,
   onVolumeChange,
-  onCycleRate,
+  onSetPlaybackRate,
   hasQueue,
   onPrevious,
   onNext,
@@ -1355,9 +1411,12 @@ export function NowPlayingBar({
           </div>
         </div>
 
-        {/* Transporte centralizado: na ordem Play/Pausa → Voltar 15s →
-            Avançar 15s (o "voltar" vem logo depois do play, antes do avançar). */}
-        <div className="flex items-center gap-1 justify-self-center sm:gap-2">
+        {/* Transporte centralizado no padrão YouTube/Spotify: Anterior → Voltar
+            15s → Play/Pause → Avançar 15s → Velocidade → Próximo. */}
+        <div
+          data-testid="np-transport"
+          className="flex items-center gap-1 justify-self-center sm:gap-2"
+        >
           {hasQueue && (
             <button
               type="button"
@@ -1371,21 +1430,21 @@ export function NowPlayingBar({
           )}
           <button
             type="button"
-            onClick={onTogglePlay}
-            aria-label={playing ? "Pausar podcast" : "Reproduzir podcast"}
-            aria-pressed={playing}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-colors hover:bg-accent sm:h-11 sm:w-11"
-          >
-            {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 translate-x-0.5 fill-current" />}
-          </button>
-          <button
-            type="button"
             onClick={onSeekBackward}
             aria-label="Voltar 15 segundos"
             title="Voltar 15 segundos"
             className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
           >
             <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={onTogglePlay}
+            aria-label={playing ? "Pausar podcast" : "Reproduzir podcast"}
+            aria-pressed={playing}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-colors hover:bg-accent sm:h-11 sm:w-11"
+          >
+            {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 translate-x-0.5 fill-current" />}
           </button>
           <button
             type="button"
@@ -1396,6 +1455,8 @@ export function NowPlayingBar({
           >
             <ChevronRight className="h-5 w-5" />
           </button>
+          {/* Seletor de velocidade compacto no centro, logo após "Avançar 15s". */}
+          <PlaybackRateMenu rate={playbackRate} onSelect={onSetPlaybackRate} />
           {hasQueue && (
             <button
               type="button"
@@ -1445,17 +1506,6 @@ export function NowPlayingBar({
               </div>
             )}
           </div>
-
-          <button
-            type="button"
-            onClick={onCycleRate}
-            aria-label="Velocidade de reprodução"
-            title="Velocidade de reprodução"
-            className="flex h-9 items-center gap-1 rounded-full bg-secondary px-2.5 text-[11px] font-bold text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <Gauge className="h-4 w-4" />
-            {playbackRate}×
-          </button>
 
           {/* Ações sociais estilo Spotify: curtir, comentar, compartilhar e
               convidar amigos para assinar — sem banco (localStorage), com
@@ -1730,7 +1780,7 @@ interface VideoBubbleProps {
   videoRef: React.RefObject<HTMLVideoElement>;
   onEnded: () => void;
   onToggleMute: () => void;
-  onCycleRate: () => void;
+  onSetPlaybackRate: (rate: number) => void;
   onSeekBackward: () => void;
   onSeekForward: () => void;
   onClose: () => void;
@@ -1745,7 +1795,7 @@ export function VideoBubble({
   videoRef,
   onEnded,
   onToggleMute,
-  onCycleRate,
+  onSetPlaybackRate,
   onSeekBackward,
   onSeekForward,
   onClose,
@@ -1831,15 +1881,7 @@ export function VideoBubble({
         >
           {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
         </button>
-        <button
-          type="button"
-          onClick={onCycleRate}
-          aria-label="Velocidade de reprodução"
-          className="flex h-7 items-center gap-0.5 rounded-full bg-secondary px-2 text-[10px] font-bold text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <Gauge className="h-3 w-3" />
-          {playbackRate}×
-        </button>
+        <PlaybackRateMenu rate={playbackRate} onSelect={onSetPlaybackRate} />
         <button
           type="button"
           onClick={onClose}

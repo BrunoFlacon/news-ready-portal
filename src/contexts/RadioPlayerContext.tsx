@@ -108,7 +108,7 @@ export function RadioPlayerProvider({ children }: RadioPlayerProviderProps) {
           onSeekForward={api.seekForward}
           onToggleMute={api.toggleMute}
           onVolumeChange={api.changeVolume}
-          onCycleRate={api.cyclePlaybackRate}
+          onSetPlaybackRate={api.setPlaybackRate}
           hasQueue={api.queue.length > 0}
           onPrevious={api.playPrevious}
           onNext={api.playNext}
@@ -137,7 +137,7 @@ export function RadioPlayerProvider({ children }: RadioPlayerProviderProps) {
           videoRef={api.videoRef}
           onEnded={api.handleMediaEnded}
           onToggleMute={api.toggleMute}
-          onCycleRate={api.cyclePlaybackRate}
+          onSetPlaybackRate={api.setPlaybackRate}
           onSeekBackward={api.seekBackward}
           onSeekForward={api.seekForward}
           onClose={api.closeNowPlaying}
