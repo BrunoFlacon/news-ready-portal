@@ -39,8 +39,17 @@ export function MediaRail({ title, eyebrow, items, portrait = false, onSelect }:
                   {item.category && <span className="mb-2 block text-[10px] font-bold uppercase text-brand">{item.category}</span>}
                   <h3 className="font-serif font-bold leading-snug text-overlay-foreground">{item.title}</h3>
                 </div>
-                <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-sm bg-background/85 px-2 py-1 text-[10px] font-bold text-foreground">
-                  <Play className="h-3 w-3 fill-current" /> {item.duration ?? "Story"}
+                <span data-testid="rail-duration" className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-sm bg-background/85 px-2 py-1 text-[10px] font-bold text-foreground">
+                  {item.duration ?? "Story"}
+                </span>
+                {/* Círculo de play: aparece apenas ao passar o dedo/mouse sobre a capa */}
+                <span
+                  data-testid="rail-play-hover"
+                  className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100"
+                >
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand/95 text-brand-foreground shadow-xl ring-2 ring-white/30">
+                    <Play className="h-5 w-5 translate-x-0.5 fill-current" />
+                  </span>
                 </span>
               </div>
             </>

@@ -17,6 +17,7 @@
  *    começa a tocar automaticamente em um card flutuante.
  */
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -513,38 +514,13 @@ function readLikesCount(): number {
 }
 
 // ---------------------------------------------------------------------------
-// Equalizador real da transmissão ao vivo (Web Audio API)
+// Equalizador da transmissão ao vivo (Web Audio API)
 // ---------------------------------------------------------------------------
 const EQ_BARS = 18;
 const EQ_MAX_HEIGHT = 16;
-
-// O AudioContext e a fonte são compartilhados entre aberturas do player; um
-// <audio> só pode ser conectado a um MediaElementSource uma única vez, por
-// isso guardamos a fonte por elemento num WeakMap.
-let sharedAudioContext: AudioContext | null = null;
-const mediaSourceByElement = new WeakMap<
-  HTMLAudioElement,
-  MediaElementAudioSourceNode
->();
-
-function getSharedAudioContext(): AudioContext | null {
-  if (sharedAudioContext) {
-    return sharedAudioContext;
-  }
-  const Ctor =
-    window.AudioContext ??
-    (window as Window & { webkitAudioContext?: typeof AudioContext })
-      .webkitAudioContext;
-  if (!Ctor) {
-    return null;
-  }
-  try {
-    sharedAudioContext = new Ctor();
-  } catch {
-    sharedAudioContext = null;
-  }
-  return sharedAudioContext;
-}
+/** Se o espectro vier zerado por ~1s seguido, o stream está bloqueado por
+ *  CORS e o gráfico cai sozinho para o modo sintético (o som nunca muda). */
+const ZERO_FRAME_LIMIT = 60;
 
 interface LiveEqualizerProps {
   audioRef: React.RefObject<HTMLAudioElement>;
@@ -557,16 +533,16 @@ interface LiveEqualizerProps {
 /**
  * Equalizador em tempo real do stream da rádio.
  *
- * Quando o navegador suporta Web Audio API, o <audio> é roteado por um
- * AnalyserNode e as barras acompanham a energia real das frequências
- * (getByteFrequencyData), atualizada a cada frame — como um equalizador
- * profissional.
+ * O sinal é "escutado" com `audio.captureStream()` + AnalyserNode — SEM rotear
+ * a saída do <audio> por um AudioContext. O antigo `createMediaElementSource`
+ * desviava o som para o gráfico e, sem headers CORS no stream da rádio,
+ * entregava espectro zerado e SILENCIAVA o ouvinte. A captura por stream é
+ * tratada como mídia independente: o que sai dos alto-falantes nunca passa
+ * pelo AudioContext e, portanto, nunca é afetado.
  *
- * O gráfico só assume o caminho do áudio quando o AudioContext está
- * rodando (resume bem-sucedido): se a política de autoplay impedir, a
- * transmissão continua saindo normalmente pelos alto-falantes e as barras
- * usam a animação CSS clássica como fallback — o som do ouvinte nunca é
- * colocado em risco.
+ * Como o stream não envia headers CORS, é comum o espectro chegar zerado
+ * (tainting). Detectamos isso e o gráfico alterna sozinho para o modo
+ * sintético animado, mantendo as barras vivas sem arriscar o áudio.
  */
 export function LiveEqualizer({
   audioRef,
@@ -594,80 +570,158 @@ export function LiveEqualizer({
     };
 
     let analyser: AnalyserNode | null = null;
+    let source: MediaStreamAudioSourceNode | null = null;
+    let stream: MediaStream | null = null;
+    let ctx: AudioContext | null = null;
     let data: Uint8Array | null = null;
     let raf = 0;
     let disposed = false;
+    let zeroFrames = 0;
+    let mode: "idle" | "synthetic" | "real" = "idle";
+    const smooth = Array.from({ length: count }, () => 3);
 
-    if (playing) {
+    // Modo sintético: barras animadas por rAF — funciona sempre, mesmo sem
+    // Web Audio API ou quando o stream é bloqueado por CORS.
+    const syntheticTick = (time: number) => {
+      if (disposed || mode !== "synthetic") {
+        return;
+      }
+      const phase = time / 1000;
+      for (let i = 0; i < count; i++) {
+        const swell = Math.sin(phase * (1.6 + (i % 5) * 0.35) + i * 0.9);
+        const breath = Math.sin(phase * 0.6 + i * 0.4);
+        const target = 4 + (swell + 1) * 2.2 + (breath + 1) * 1.6;
+        smooth[i] += (target - smooth[i]) * 0.18;
+      }
+      setHeights(smooth);
+      raf = requestAnimationFrame(syntheticTick);
+    };
+
+    // Modo real: leitura do espectro capturado do <audio> sem desviar o som.
+    const realTick = () => {
+      if (disposed || mode !== "real") {
+        return;
+      }
+      if (analyser && data) {
+        analyser.getByteFrequencyData(data);
+        let peak = 0;
+        for (let i = 0; i < data.length; i++) {
+          if (data[i] > peak) {
+            peak = data[i];
+          }
+        }
+        if (peak < 4) {
+          // Espectro zerado — stream tainted por CORS ou contexto suspenso.
+          zeroFrames += 1;
+          if (zeroFrames >= ZERO_FRAME_LIMIT) {
+            mode = "synthetic";
+            setRealTime(false);
+            try {
+              source?.disconnect();
+            } catch {
+              // Nó já desconectado; nada a fazer.
+            }
+            analyser = null;
+            data = null;
+            raf = requestAnimationFrame(syntheticTick);
+            return;
+          }
+        } else {
+          zeroFrames = 0;
+        }
+        for (let i = 0; i < count; i++) {
+          // Bins distribuídos logaritmicamente: graves à esquerda, agudos
+          // à direita — leitura fiel do espectro da transmissão.
+          const bin = Math.min(
+            data.length - 1,
+            Math.max(0, Math.round(Math.pow(data.length, (i + 1) / count) - 1)),
+          );
+          const target = ((data[bin] ?? 0) / 255) * EQ_MAX_HEIGHT;
+          smooth[i] += (target - smooth[i]) * 0.45;
+        }
+        setHeights(smooth);
+      }
+      raf = requestAnimationFrame(realTick);
+    };
+
+    const startReal = () => {
+      if (mode === "real" || disposed) {
+        return;
+      }
+      mode = "real";
+      setRealTime(true);
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(realTick);
+    };
+
+    if (!playing) {
+      setHeights(idleHeights);
+      setRealTime(false);
+    } else {
+      // Começa pelo modo sintético (movimento garantido); troca para o
+      // espectro real assim que o contexto rodar e houver sinal.
+      mode = "synthetic";
+      setRealTime(false);
+      raf = requestAnimationFrame(syntheticTick);
+
       const audio = audioRef.current;
-      const ctx = audio ? getSharedAudioContext() : null;
-      if (audio && ctx) {
+      // Firefox: captureStream em <audio> silencia a saída do elemento
+      // (bug 1581192) — nesse navegador ficamos no modo sintético para
+      // garantir que a rádio continue tocando.
+      const isFirefox =
+        typeof navigator !== "undefined" &&
+        /Firefox\//.test(navigator.userAgent);
+      const Ctor =
+        window.AudioContext ??
+        (window as Window & { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
+      const capture =
+        audio &&
+        (audio as HTMLAudioElement & { captureStream?: () => MediaStream })
+          .captureStream;
+
+      if (audio && capture && Ctor && !isFirefox) {
         try {
+          stream = capture.call(audio) ?? null;
+          if (!stream) {
+            throw new Error("Nenhum fluxo capturável no <audio>");
+          }
+          ctx = new Ctor();
+          source = ctx.createMediaStreamSource(stream);
           analyser = ctx.createAnalyser();
           analyser.fftSize = 64;
           data = new Uint8Array(analyser.frequencyBinCount);
-          const connect = () => {
-            if (disposed || !analyser || !data) {
-              return;
+          // SEM conexão com ctx.destination: o áudio do elemento segue
+          // saindo normalmente pelos alto-falantes.
+          source.connect(analyser);
+          void ctx.resume?.().then(() => {
+            if (!disposed && ctx && ctx.state === "running") {
+              startReal();
             }
-            let source = mediaSourceByElement.get(audio);
-            if (!source) {
-              source = ctx.createMediaElementSource(audio);
-              mediaSourceByElement.set(audio, source);
-            }
-            source.connect(analyser);
-            analyser.connect(ctx.destination);
-            setRealTime(true);
-          };
-          if (ctx.state === "running") {
-            connect();
-          } else {
-            void ctx.resume().then(() => {
-              if (!disposed && ctx.state === "running") {
-                connect();
-              }
-            });
-          }
+          });
         } catch {
           analyser = null;
+          source = null;
+          data = null;
         }
       }
-
-      const smooth = Array.from({ length: count }, () => 3);
-      const tick = () => {
-        if (!disposed && analyser && data) {
-          analyser.getByteFrequencyData(data);
-          for (let i = 0; i < count; i++) {
-            // Bins distribuídos logaritmicamente: graves à esquerda, agudos
-            // à direita — leitura fiel do espectro real da transmissão.
-            const bin = Math.min(
-              data.length - 1,
-              Math.max(0, Math.round(Math.pow(data.length, (i + 1) / count) - 1)),
-            );
-            const target = ((data[bin] ?? 0) / 255) * EQ_MAX_HEIGHT;
-            smooth[i] += (target - smooth[i]) * 0.45;
-          }
-          setHeights(smooth);
-        }
-        if (!disposed) {
-          raf = requestAnimationFrame(tick);
-        }
-      };
-      raf = requestAnimationFrame(tick);
-    } else {
-      setHeights(idleHeights);
-      setRealTime(false);
     }
 
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
-      if (analyser) {
-        try {
-          analyser.disconnect();
-        } catch {
-          // Analisador já removido pelo contexto; nada a fazer.
+      try {
+        source?.disconnect();
+      } catch {
+        // Nó já desconectado; nada a fazer.
+      }
+      if (stream) {
+        for (const track of stream.getTracks()) {
+          track.stop();
         }
+      }
+      if (ctx) {
+        void ctx.close();
       }
     };
   }, [audioRef, playing, bars]);
@@ -960,8 +1014,19 @@ export function RadioPlayerBar({
         </button>
       </div>
 
-      {requestOpen && <RequestMusicDialog onClose={() => setRequestOpen(false)} />}
-      {shareOpen && <ShareDialog onClose={() => setShareOpen(false)} />}
+      {/* Os diálogos são portados para o <body>: a barra usa backdrop-blur, e
+          o backdrop-filter cria um containing block que enterraria um modal
+          `fixed inset-0` no rodapé do navegador. */}
+      {requestOpen &&
+        createPortal(
+          <RequestMusicDialog onClose={() => setRequestOpen(false)} />,
+          document.body,
+        )}
+      {shareOpen &&
+        createPortal(
+          <ShareDialog onClose={() => setShareOpen(false)} />,
+          document.body,
+        )}
     </div>
   );
 }

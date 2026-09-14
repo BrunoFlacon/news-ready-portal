@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  BookOpen,
   Crown,
   Heart,
   Lock,
@@ -299,6 +300,8 @@ function RadioHero({
   }, []);
 
   const active = watchFeed[activeIndex % watchFeed.length];
+  // Quando a manchete tem matéria vinculada, a capa abre o artigo para leitura.
+  const articleLink = active.articleId ? `/artigo/${active.articleId}` : null;
 
   // Rotação automática dos destaques — suspensa enquanto o banner é usado.
   useEffect(() => {
@@ -370,27 +373,52 @@ function RadioHero({
     >
       {!watch && (
         <>
-          {/* A capa do destaque cobre o banner inteiro; clicar reproduz com
-              áudio ativado (vídeo ou live), sem duplicar a imagem num card. */}
-          <button
-            type="button"
-            onClick={() => onPlay(active)}
-            aria-label={`Reproduzir ${active.title}`}
-            className="group absolute inset-0 block h-full w-full"
-          >
-            <img
-              src={active.image}
-              alt=""
-              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-            />
-            <div className="absolute inset-0 bg-hero-overlay" />
-            {/* Botão do player no centro da tela, como no YouTube */}
-            <span className="absolute inset-0 flex items-center justify-center">
-              <span className="flex h-20 w-20 items-center justify-center rounded-full bg-brand/95 text-brand-foreground shadow-2xl ring-4 ring-white/25 transition-transform duration-200 group-hover:scale-110 md:h-24 md:w-24">
+          {/* A capa do destaque cobre o banner inteiro. Quando a manchete tem
+              matéria vinculada, a capa abre o artigo para leitura; sem matéria,
+              o clique na capa reproduz. O play central aparece só no hover. */}
+          <div className="group absolute inset-0 block h-full w-full">
+            {articleLink ? (
+              <Link
+                to={articleLink}
+                aria-label={`Abrir matéria: ${active.title}`}
+                className="absolute inset-0 block h-full w-full"
+              >
+                <img
+                  src={active.image}
+                  alt=""
+                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                />
+                <div className="absolute inset-0 bg-hero-overlay" />
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onPlay(active)}
+                aria-label={`Reproduzir ${active.title}`}
+                className="absolute inset-0 block h-full w-full"
+              >
+                <img
+                  src={active.image}
+                  alt=""
+                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                />
+                <div className="absolute inset-0 bg-hero-overlay" />
+              </button>
+            )}
+
+            {/* Botão do player no centro da capa — visível apenas ao passar o
+                dedo/mouse sobre a capa ou ao focar (estilo YouTube) */}
+            <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100">
+              <button
+                type="button"
+                onClick={() => onPlay(active)}
+                aria-label={`Reproduzir ${active.title}`}
+                className="pointer-events-auto flex h-20 w-20 items-center justify-center rounded-full bg-brand/95 text-brand-foreground shadow-2xl ring-4 ring-white/25 transition-transform duration-200 group-hover:scale-110 md:h-24 md:w-24"
+              >
                 <Play className="h-9 w-9 translate-x-0.5 fill-current md:h-10 md:w-10" />
-              </span>
+              </button>
             </span>
-          </button>
+          </div>
           <div className="container relative flex min-h-[640px] flex-col justify-end py-12 md:min-h-[700px] md:py-16">
             <div className="max-w-2xl">
               <div className="mb-5 flex flex-wrap items-center gap-3">
@@ -417,12 +445,25 @@ function RadioHero({
               <div className="flex items-start gap-4 sm:gap-5">
                 <div className="min-w-0">
                   <h1 className="font-serif text-3xl font-bold leading-tight text-overlay-foreground md:text-5xl">
-                    {active.title}
+                    {articleLink ? (
+                      <Link to={articleLink} className="transition-colors hover:text-brand">
+                        {active.title}
+                      </Link>
+                    ) : (
+                      active.title
+                    )}
                   </h1>
                   <p className="mt-3 max-w-2xl text-base leading-relaxed text-overlay-muted md:text-lg">
                     {watchBlurb(active)}
                   </p>
-                  <div className="mt-6">
+                  <div className="mt-6 flex flex-wrap items-center gap-3">
+                    {articleLink && (
+                      <Button asChild size="lg">
+                        <Link to={articleLink} className="gap-2">
+                          <BookOpen className="h-5 w-5" /> Ler matéria
+                        </Link>
+                      </Button>
+                    )}
                     <Button asChild variant="outline" size="lg">
                       <Link to="/noticias">
                         <Newspaper className="h-5 w-5" /> Acessar Vitória News
@@ -432,9 +473,19 @@ function RadioHero({
                 </div>
               </div>
             </div>
-            <div className="mt-6 flex justify-end gap-1.5 lg:hidden" aria-hidden>
+            <div className="mt-6 flex justify-end gap-1.5 lg:hidden" aria-label="Selecionar manchete em destaque">
               {watchFeed.map((item, index) => (
-                <span key={item.id} className={cn("h-1.5 w-6 rounded-full", index === activeIndex ? "bg-brand" : "bg-foreground/20")} />
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveIndex(index)}
+                  aria-label={`Ir para manchete: ${item.title}`}
+                  aria-current={index === activeIndex}
+                  className={cn(
+                    "h-1.5 w-6 rounded-full transition-colors",
+                    index === activeIndex ? "bg-brand" : "bg-foreground/20 hover:bg-foreground/40",
+                  )}
+                />
               ))}
             </div>
           </div>

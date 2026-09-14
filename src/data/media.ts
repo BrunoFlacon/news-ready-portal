@@ -1,24 +1,46 @@
 import { articles } from "./articles";
 
+/** Capa exclusiva por manchete — evita que itens vizinhos do carrossel
+ *  compartilhem a mesma imagem (a manchete muda mas a capa fica igual). */
+const cover = (photoId: string) =>
+  `https://images.unsplash.com/${photoId}?w=800&q=80`;
+
+const covers = {
+  code: cover("photo-1498050108023-c5249f4df085"),
+  chip: cover("photo-1518770660439-4636190af475"),
+  cinema: cover("photo-1489599849927-2ee91cede3ba"),
+  docs: cover("photo-1450101499163-c8848c66ca85"),
+  dataCenter: cover("photo-1558494949-ef010cbdcc31"),
+  team: cover("photo-1522071820081-009f0129c71c"),
+  healthAi: cover("photo-1576091160399-112ba8d25d1d"),
+  theater: cover("photo-1517604931442-7e0c8ed2963c"),
+  solar: cover("photo-1509391366360-2e959784a276"),
+  mic: cover("photo-1478737270239-2f02b77fc618"),
+  news: cover("photo-1504711434969-e33886168f5c"),
+  matrix: cover("photo-1526374965328-7f61d4dc18c5"),
+  festival: cover("photo-1533174072545-7a4b6ad7a6c3"),
+  studio: cover("photo-1590602847861-f357a9332bbc"),
+} as const;
+
 export const socialMedia = [
-  { id: "reel-1", title: "Inteligência artificial na saúde", category: "Tecnologia", image: articles[1].imageUrl, duration: "0:42" },
-  { id: "reel-2", title: "Cinema nacional em destaque", category: "Entretenimento", image: articles[2].imageUrl, duration: "0:36" },
-  { id: "reel-3", title: "Energia solar brasileira", category: "Tecnologia", image: articles[4].imageUrl, duration: "0:51" },
-  { id: "reel-4", title: "Bastidores da redação", category: "Rádio", image: articles[0].imageUrl, duration: "0:28" },
+  { id: "reel-1", title: "Inteligência artificial na saúde", category: "Tecnologia", image: covers.healthAi, duration: "0:42" },
+  { id: "reel-2", title: "Cinema nacional em destaque", category: "Entretenimento", image: covers.theater, duration: "0:36" },
+  { id: "reel-3", title: "Energia solar brasileira", category: "Tecnologia", image: covers.solar, duration: "0:51" },
+  { id: "reel-4", title: "Bastidores da redação", category: "Rádio", image: covers.mic, duration: "0:28" },
 ];
 
 export const stories = [
-  { id: "story-1", title: "Notícias", image: articles[0].imageUrl },
-  { id: "story-2", title: "Tecnologia", image: articles[1].imageUrl },
-  { id: "story-3", title: "Cultura", image: articles[2].imageUrl },
-  { id: "story-4", title: "Ao vivo", image: articles[5].imageUrl },
+  { id: "story-1", title: "Notícias", image: covers.news },
+  { id: "story-2", title: "Tecnologia", image: covers.matrix },
+  { id: "story-3", title: "Cultura", image: covers.festival },
+  { id: "story-4", title: "Ao vivo", image: covers.studio },
 ];
 
 export const videoCuts = [
-  { id: "video-1", title: "Entenda o novo pacote de infraestrutura digital", image: articles[0].imageUrl, duration: "08:14" },
-  { id: "video-2", title: "Como a IA está transformando os diagnósticos", image: articles[1].imageUrl, duration: "12:08" },
-  { id: "video-3", title: "Os destaques do cinema nacional em 2026", image: articles[2].imageUrl, duration: "06:32" },
-  { id: "video-4", title: "LGPD: o que muda com as novas regras", image: articles[3].imageUrl, duration: "09:47" },
+  { id: "video-1", title: "Entenda o novo pacote de infraestrutura digital", image: covers.code, duration: "08:14" },
+  { id: "video-2", title: "Como a IA está transformando os diagnósticos", image: covers.chip, duration: "12:08" },
+  { id: "video-3", title: "Os destaques do cinema nacional em 2026", image: covers.cinema, duration: "06:32" },
+  { id: "video-4", title: "LGPD: o que muda com as novas regras", image: covers.docs, duration: "09:47" },
 ];
 
 export const institutionalServices = [
@@ -141,7 +163,20 @@ export interface WatchFeedItem {
   image: string;
   videoUrl: string;
   duration?: string;
+  /** Quando presente, a capa/manchete abre a matéria correspondente. */
+  articleId?: string;
 }
+
+/** Vínculo manchete → matéria (rota /artigo/:id) para a capa clicável. */
+const watchArticleId: Record<string, string | undefined> = {
+  "video-1": "1",
+  "video-2": "2",
+  "video-3": "3",
+  "video-4": "4",
+  "reel-1": "2",
+  "reel-2": "3",
+  "reel-3": "5",
+};
 
 const watchCaption = (text: string) =>
   `Legenda do áudio: ${text} Acompanhe o conteúdo na íntegra na programação da Web Rádio Vitória.`;
@@ -161,6 +196,7 @@ export const watchFeed: WatchFeedItem[] = [
     image: video.image,
     videoUrl: watchVideoUrl(video.id),
     duration: video.duration,
+    articleId: watchArticleId[video.id],
   })),
   // Lives (programação ao vivo em andamento)
   {
@@ -171,7 +207,7 @@ export const watchFeed: WatchFeedItem[] = [
     title: "Culto de adoração ao vivo",
     headline: "Culto de adoração ao vivo agora na Web Rádio Vitória",
     caption: watchCaption("Culto de adoração com louvores, oração e palavra para toda a família."),
-    image: articles[0].imageUrl,
+    image: covers.dataCenter,
     videoUrl: watchVideoUrl("live-now-1"),
     duration: "Ao vivo",
   },
@@ -183,7 +219,7 @@ export const watchFeed: WatchFeedItem[] = [
     title: "Bate-papo com a comunidade",
     headline: "Bate-papo ao vivo: a comunidade responde",
     caption: watchCaption("Participação da audiência com perguntas, recados e testemunhos."),
-    image: articles[2].imageUrl,
+    image: covers.team,
     videoUrl: watchVideoUrl("live-now-2"),
     duration: "Ao vivo",
   },
@@ -199,6 +235,7 @@ export const watchFeed: WatchFeedItem[] = [
     image: reel.image,
     videoUrl: watchVideoUrl(reel.id),
     duration: reel.duration,
+    articleId: watchArticleId[reel.id],
   })),
   // Stories (formato vertical)
   ...stories.map((story) => ({

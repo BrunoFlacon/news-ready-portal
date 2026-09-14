@@ -830,6 +830,95 @@ describe("Home — player imersivo no banner gigante", () => {
     ).toBeInTheDocument();
   });
 
+  it("a capa da manchete abre a matéria vinculada e o play fica oculto até o hover", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    // Com matéria vinculada (video-1 → /artigo/1), a capa vira um link de
+    // leitura — sem botão fixo sobre a imagem.
+    const coverLink = screen.getByRole("link", {
+      name: /Abrir matéria: Entenda o novo pacote de infraestrutura digital/i,
+    });
+    expect(coverLink).toHaveAttribute("href", "/artigo/1");
+
+    // O play central existe, mas surge só no hover/foco (marcado por CSS).
+    const group = coverLink.closest(".group") as HTMLElement;
+    const centralPlay = within(group).getByRole("button", {
+      name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
+    });
+    const playWrapper = centralPlay.closest("span.absolute") as HTMLElement;
+    expect(playWrapper.className).toContain("opacity-0");
+    expect(playWrapper.className).toContain("group-hover:opacity-100");
+    expect(playWrapper.className).toContain("group-focus-within:opacity-100");
+    expect(playWrapper.className).toContain("pointer-events-none");
+
+    // O atalho "Ler matéria" também aponta para o mesmo artigo.
+    expect(screen.getByRole("link", { name: "Ler matéria" })).toHaveAttribute(
+      "href",
+      "/artigo/1",
+    );
+  });
+
+  it("os pontos do carrossel trocam a manchete e a capa em destaque", () => {
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Ir para manchete: Como a IA está transformando os diagnósticos/i,
+      }),
+    );
+
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: /Como a IA está transformando os diagnósticos/i,
+      }),
+    ).toBeInTheDocument();
+    // A nova manchete também tem matéria vinculada (/artigo/2).
+    expect(
+      screen.getByRole("link", {
+        name: /Abrir matéria: Como a IA está transformando os diagnósticos/i,
+      }),
+    ).toHaveAttribute("href", "/artigo/2");
+  });
+
+  it("manchete sem matéria vinculada mantém a capa clicável para reproduzir", () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Ir para manchete: Culto de adoração ao vivo/i,
+      }),
+    );
+
+    // Live não tem matéria: a capa continua sendo o botão de play.
+    expect(
+      screen
+        .getAllByRole("button", {
+          name: /Reproduzir Culto de adoração ao vivo/i,
+        })
+        .length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("no carrossel de reels o badge mostra só a duração e o play aparece no hover", () => {
+    renderWithProviders(<Home />);
+
+    const reelCard = screen.getByRole("button", {
+      name: /Assistir Inteligência artificial na saúde/i,
+    });
+    // Badge informativo (duração), sem ícone de play fixo.
+    expect(within(reelCard).getByTestId("rail-duration")).toHaveTextContent(
+      "0:42",
+    );
+    // Círculo de play presente, mas oculto até o hover (via CSS).
+    const hoverPlay = within(reelCard).getByTestId("rail-play-hover");
+    expect(hoverPlay).toHaveClass("opacity-0");
+    expect(hoverPlay).toHaveClass("group-hover:opacity-100");
+    expect(hoverPlay).toHaveClass("pointer-events-none");
+  });
+
   it("mostra o botão central de play apenas ao passar o dedo sobre a capa (estilo YouTube)", () => {
     mockMedia();
     renderWithProviders(<Home />);
