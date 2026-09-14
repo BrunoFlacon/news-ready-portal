@@ -586,10 +586,10 @@ export function YouTubePlayer({
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
       className={cn(
-        "group/player relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden",
+        "group/player relative flex h-full cursor-pointer items-center justify-center overflow-hidden",
         orientation === "vertical"
-          ? "aspect-[9/16] h-full w-auto rounded-lg bg-black shadow-2xl"
-          : "rounded-lg",
+          ? "aspect-[9/16] h-full w-auto max-w-full rounded-lg bg-black shadow-2xl"
+          : "w-full rounded-lg",
         scrubbing && "scrubbing",
         paused && "paused",
         fullscreen && "full-screen",

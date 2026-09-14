@@ -130,8 +130,8 @@ function WatchOverlay({
           {/* O vídeo ocupa o banner inteiro com o player estilo YouTube. O
               wrapper `relative` existe para o rail vertical (reels/stories)
               ficar colado à borda direita do VÍDEO — e não da tela. */}
-          <div className="absolute inset-0 z-10 flex items-center justify-center">
-            <div className="relative">
+          <div className="absolute inset-0 z-10 flex h-full w-full items-center justify-center">
+            <div className={cn("relative h-full", vertical ? "w-fit max-w-full" : "w-full")}>
               <YouTubePlayer
                 src={item.videoUrl}
                 poster={item.image}

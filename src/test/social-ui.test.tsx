@@ -8,7 +8,7 @@
  * para o banco — ambos cobertos por `social.test.ts`.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor, within } from "@testing-library/react";
 import Home from "@/pages/Home";
 import { renderWithProviders } from "@/test/utils";
 import { watchFeed } from "@/data/media";
@@ -148,6 +148,79 @@ describe("Ferramentas sociais — conversas e convites", () => {
     expect(invites.length).toBe(1);
     expect(invites[0].publicationId).toBe(video.id);
     expect(invites[0].value).toBe("whatsapp");
+  });
+});
+
+describe("Auditoria layout (Onda 2) — rail e vídeos", () => {
+  it("rail vertical sem classes frágeis (backdrop-blur/shadow/border) e com fundo limpo", async () => {
+    renderWithProviders(<Home />);
+    const reel = reelItem ?? watchFeed.find((item) => item.orientation === "vertical")!;
+    openReel(reel.title);
+    await waitFor(() => {
+      expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
+    });
+
+    const rail = screen.getByTestId("social-rail");
+    expect(rail).toBeInTheDocument();
+    // Classes frágeis/desativadas removidas conforme o plano (item 2.1).
+    expect(rail.className).not.toContain("backdrop-blur");
+    expect(rail.className).not.toContain("shadow-2xl");
+    expect(rail.className).not.toContain("border");
+    expect(rail.className).not.toContain("px-2.5");
+    expect(rail.className).not.toContain("py-4");
+    // Substituição limpa e determinística.
+    expect(rail).toHaveClass("bg-black/60");
+    expect(rail).toHaveClass("rounded-2xl");
+  });
+
+  it("contadores ficam à ESQUERDA do ícone no rail vertical (item 2.2)", async () => {
+    renderWithProviders(<Home />);
+    const reel = reelItem ?? watchFeed.find((item) => item.orientation === "vertical")!;
+    openReel(reel.title);
+    await waitFor(() => {
+      expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
+    });
+
+    const rail = screen.getByTestId("social-rail");
+    const likeButton = within(rail).getByRole("button", { name: "Curtir publicação" });
+    const commentButton = within(rail).getByRole("button", { name: "Comentar publicação" });
+
+    // Primeiro filho do botão = contador; o SVG vem depois (à direita).
+    expect(likeButton.firstElementChild).toHaveAttribute("data-testid", "social-likes-count");
+    expect(commentButton.firstElementChild).toHaveAttribute("data-testid", "social-comments-count");
+  });
+});
+
+describe("Auditoria layout (Onda 2) — preenchimento dos vídeos", () => {
+  it("reels 9:16 preenchem a altura do banner gigante (item 2.3)", async () => {
+    renderWithProviders(<Home />);
+    const reel = reelItem ?? watchFeed.find((item) => item.orientation === "vertical")!;
+    openReel(reel.title);
+    await waitFor(() => {
+      expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
+    });
+
+    const player = screen.getByTestId("youtube-player");
+    // O wrapper `relative` do player ganha altura total do banner.
+    expect(player.parentElement).toHaveClass("h-full");
+    // O player 9:16 permanece vertical, centralizado pelo flex do overlay.
+    expect(player).toHaveClass("aspect-[9/16]");
+  });
+
+  it("vídeos 16:9 voltam a preencher a tela (regressão do wrapper, item 3.1)", async () => {
+    renderWithProviders(<Home />);
+    const video = videoItem ?? watchFeed[0];
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`Reproduzir ${video.title}`) }));
+    await waitFor(() => {
+      expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
+    });
+
+    const player = screen.getByTestId("youtube-player");
+    // O wrapper relativo agora estica (h-full w-full) → o player 16:9 cobre o banner.
+    expect(player.parentElement).toHaveClass("h-full");
+    expect(player.parentElement).toHaveClass("w-full");
+    expect(player).toHaveClass("h-full");
+    expect(player).toHaveClass("w-full");
   });
 });
 

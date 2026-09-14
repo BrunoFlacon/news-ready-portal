@@ -313,7 +313,7 @@ export function SocialBar({ publicationId, title, hidden }: SocialBarProps) {
       {!hidden && (
         <div
           data-testid="social-bar"
-          className="absolute bottom-20 right-4 z-20 flex items-center gap-1 rounded-full border border-white/10 bg-black/50 px-2 py-1.5 shadow-2xl backdrop-blur-md lg:bottom-24 lg:right-6"
+          className="absolute bottom-20 right-4 z-20 flex items-center gap-1 rounded-full bg-black/60 px-2 py-1.5 lg:bottom-24 lg:right-6"
         >
         <SocialIconButton
           label={social.liked ? "Descurtir publicação" : "Curtir publicação"}
@@ -368,19 +368,19 @@ export function SocialRail({ publicationId, title }: SocialRailProps) {
     <>
       <div
         data-testid="social-rail"
-        className="absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center gap-4 rounded-full border border-white/10 bg-black/50 px-2.5 py-4 shadow-2xl backdrop-blur-md"
+        className="absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col items-stretch gap-3 rounded-2xl bg-black/60 p-2"
       >
         <SocialIconButton
           label={social.liked ? "Descurtir publicação" : "Curtir publicação"}
           pressed={social.liked}
           onClick={social.toggleLike}
         >
+          <SocialCount value={social.likesCount} testId="social-likes-count" className="min-w-6 text-right" />
           <Heart className={cn("h-[22px] w-[22px]", social.liked && "fill-red-500 text-red-500")} />
-          <SocialCount value={social.likesCount} testId="social-likes-count" />
         </SocialIconButton>
         <SocialIconButton label="Comentar publicação" onClick={() => setDialog("comments")}>
+          <SocialCount value={social.comments.length} testId="social-comments-count" className="min-w-6 text-right" />
           <MessageCircle className="h-[22px] w-[22px]" />
-          <SocialCount value={social.comments.length} testId="social-comments-count" />
         </SocialIconButton>
         <SocialIconButton label="Compartilhar publicação" onClick={() => setDialog("share")}>
           <Share2 className="h-[22px] w-[22px]" />
@@ -437,9 +437,9 @@ function SocialIconButton({ label, pressed, onClick, children }: SocialIconButto
   );
 }
 
-function SocialCount({ value, testId }: { value: number; testId: string }) {
+function SocialCount({ value, testId, className }: { value: number; testId: string; className?: string }) {
   return (
-    <span data-testid={testId} className="text-[11px] font-semibold tabular-nums">
+    <span data-testid={testId} className={cn("text-[11px] font-semibold tabular-nums", className)}>
       {value > 0 ? value : ""}
     </span>
   );
