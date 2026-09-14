@@ -1,6 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  BookOpen,
   Crown,
   Heart,
   Lock,
@@ -18,6 +17,8 @@ import { Layout } from "@/components/Layout";
 import { MediaRail } from "@/components/MediaRail";
 import { YouTubePlayer } from "@/components/YouTubePlayer";
 import { Button } from "@/components/ui/button";
+import { SocialBar, SocialRail } from "@/components/SocialDialogs";
+import { trackView } from "@/lib/social";
 import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
 import { extractPalette, type AmbientPalette } from "@/lib/ambient";
 import { podcasts } from "@/data/podcasts";
@@ -96,6 +97,16 @@ function WatchOverlay({
   const next = phase === "transition" ? watch.next : null;
   const vertical = item.orientation === "vertical";
 
+  // Tempo de visualização: acumula o tempo em exibição por publicação
+  // (métrica "view" — v0 sem banco; pronta para sincronização futura).
+  useEffect(() => {
+    if (transitioning) {
+      return;
+    }
+    const timer = window.setInterval(() => trackView(item.id, 5), 5000);
+    return () => window.clearInterval(timer);
+  }, [item.id, transitioning]);
+
   return (
     <div
       data-testid="watch-overlay"
@@ -172,6 +183,23 @@ function WatchOverlay({
             </p>
             {next && <p className="mt-2 text-xs font-bold text-brand">A seguir: {next.title}</p>}
           </div>
+
+          {/* Ferramentas sociais: barra horizontal (lives/vídeos/imagens
+              horizontais) ou rail vertical (reels/stories), com curtir,
+              comentar, compartilhar e convidar amigos para assinar. */}
+          {vertical ? (
+            <SocialRail
+              publicationId={item.id}
+              title={item.title}
+              visible={uiVisible}
+            />
+          ) : (
+            <SocialBar
+              publicationId={item.id}
+              title={item.title}
+              visible={uiVisible}
+            />
+          )}
         </>
       )}
 
@@ -279,9 +307,6 @@ function RadioHero({
   onAutoPlay: () => void;
   onPremiumRequest: (target: PremiumTarget) => void;
 }) {
-  const player = useRadioPlayerContext();
-  const hasStream = Boolean(player.streamUrl);
-
   const [activeIndex, setActiveIndex] = useState(0);
   const [ambient, setAmbient] = useState<AmbientPalette>({ a: "#7c2d12", b: "#1c1917" });
   const [uiVisible, setUiVisible] = useState(true);
@@ -422,25 +447,18 @@ function RadioHero({
           <div className="container relative flex min-h-[640px] flex-col justify-end py-12 md:min-h-[700px] md:py-16">
             <div className="max-w-2xl">
               <div className="mb-5 flex flex-wrap items-center gap-3">
-                {hasStream ? (
-                  <span className="inline-flex items-center gap-2 rounded-sm bg-live px-3 py-1.5 text-[10px] font-bold uppercase text-live-foreground">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" />
-                    Ao vivo
+                {/* Badge de nicho/tema — exibido somente quando a manchete tem
+                    matéria vinculada com categoria/tema definido. As tarjas
+                    fixas ("Ao vivo • De Tupã para todo o Brasil") foram
+                    removidas por pedido editorial. */}
+                {active.theme && (
+                  <span
+                    data-testid="hero-theme-badge"
+                    className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md"
+                  >
+                    {active.theme}
                   </span>
-                ) : upcomingLive ? (
-                  <>
-                    <span className="inline-flex items-center gap-2 rounded-sm bg-live px-3 py-1.5 text-[10px] font-bold uppercase text-live-foreground">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-live-foreground" />
-                      Em breve live
-                    </span>
-                    <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
-                      {upcomingLive.day} • {upcomingLive.time}
-                    </span>
-                  </>
-                ) : null}
-                <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
-                  De Tupã para todo o Brasil
-                </span>
+                )}
               </div>
               <div className="flex items-start gap-4 sm:gap-5">
                 <div className="min-w-0">
@@ -457,15 +475,8 @@ function RadioHero({
                     {watchBlurb(active)}
                   </p>
                   <div className="mt-6 flex flex-wrap items-center gap-3">
-                    {articleLink && (
-                      <Button asChild size="lg">
-                        <Link to={articleLink} className="gap-2">
-                          <BookOpen className="h-5 w-5" /> Ler matéria
-                        </Link>
-                      </Button>
-                    )}
                     <Button asChild variant="outline" size="lg">
-                      <Link to="/noticias">
+                      <Link to={articleLink ?? "/noticias"}>
                         <Newspaper className="h-5 w-5" /> Acessar Vitória News
                       </Link>
                     </Button>

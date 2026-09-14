@@ -165,6 +165,12 @@ export interface WatchFeedItem {
   duration?: string;
   /** Quando presente, a capa/manchete abre a matéria correspondente. */
   articleId?: string;
+  /**
+   * Nicho/tema editorial da manchete. Quando presente, o carrossel exibe o
+   * badge correspondente sobre o título; sem tema, nenhum badge é mostrado
+   * (as tarjas fixas "Ao vivo • De Tupã para todo o Brasil" foram removidas).
+   */
+  theme?: string;
 }
 
 /** Vínculo manchete → matéria (rota /artigo/:id) para a capa clicável. */
@@ -176,6 +182,18 @@ const watchArticleId: Record<string, string | undefined> = {
   "reel-1": "2",
   "reel-2": "3",
   "reel-3": "5",
+};
+
+/**
+ * Nicho/tema da manchete a partir da matéria vinculada. O carrossel só exibe
+ * o badge sobre o título quando há tema — as tarjas fixas ("Ao Vivo • De Tupã
+ * para todo o Brasil") foram descontinuadas.
+ */
+const themeOf = (articleId: string | undefined): string | undefined => {
+  if (!articleId) {
+    return undefined;
+  }
+  return articles.find((article) => article.id === articleId)?.category;
 };
 
 const watchCaption = (text: string) =>
@@ -197,6 +215,7 @@ export const watchFeed: WatchFeedItem[] = [
     videoUrl: watchVideoUrl(video.id),
     duration: video.duration,
     articleId: watchArticleId[video.id],
+    theme: themeOf(watchArticleId[video.id]),
   })),
   // Lives (programação ao vivo em andamento)
   {
@@ -236,6 +255,7 @@ export const watchFeed: WatchFeedItem[] = [
     videoUrl: watchVideoUrl(reel.id),
     duration: reel.duration,
     articleId: watchArticleId[reel.id],
+    theme: themeOf(watchArticleId[reel.id]),
   })),
   // Stories (formato vertical)
   ...stories.map((story) => ({

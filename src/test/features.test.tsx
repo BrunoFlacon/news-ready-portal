@@ -35,12 +35,15 @@ afterEach(() => {
 });
 
 describe("RadioPlayer — player global no cabeçalho", () => {
-  it("sem VITE_RADIO_STREAM_URL mostra 'Em breve live' com o horário e não expõe botão de tocar", () => {
+  it("sem VITE_RADIO_STREAM_URL o carrossel não exibe tarjas fixas e não expõe botão de tocar", () => {
     vi.stubEnv("VITE_RADIO_STREAM_URL", "");
     renderWithProviders(<Home />);
 
-    expect(screen.getByText("Em breve live")).toBeInTheDocument();
-    // Tarja do banner + menu lateral da programação exibem o mesmo horário.
+    // As tarjas fixas ("Ao vivo • De Tupã para todo o Brasil") foram
+    // removidas do topo das manchetes por pedido editorial.
+    expect(screen.queryByText("Em breve live")).not.toBeInTheDocument();
+    expect(screen.queryByText("De Tupã para todo o Brasil")).not.toBeInTheDocument();
+    // A próxima live continua documentada na grade de programação.
     expect(screen.getAllByText("Domingo • 19h").length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: /Ouvir Agora/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Pausar/i })).not.toBeInTheDocument();
@@ -852,11 +855,12 @@ describe("Home — player imersivo no banner gigante", () => {
     expect(playWrapper.className).toContain("group-focus-within:opacity-100");
     expect(playWrapper.className).toContain("pointer-events-none");
 
-    // O atalho "Ler matéria" também aponta para o mesmo artigo.
-    expect(screen.getByRole("link", { name: "Ler matéria" })).toHaveAttribute(
-      "href",
-      "/artigo/1",
-    );
+    // O botão "Ler matéria" foi removido; "Acessar Vitória News" é o único
+    // atalho e aponta para o link correto da matéria vinculada.
+    expect(screen.queryByRole("link", { name: "Ler matéria" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Acessar Vitória News/i }),
+    ).toHaveAttribute("href", "/artigo/1");
   });
 
   it("os pontos do carrossel trocam a manchete e a capa em destaque", () => {

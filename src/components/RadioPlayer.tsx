@@ -37,6 +37,7 @@ import {
   Share2,
   SkipBack,
   SkipForward,
+  UserPlus,
   Video,
   Volume2,
   VolumeX,
@@ -45,6 +46,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SITE_URL, whatsAppLink } from "@/lib/whatsapp";
+import { useSocialItem } from "@/lib/social";
+import { CommentDialog, InviteDialog, ShareContentDialog } from "@/components/SocialDialogs";
 import { podcasts, type Podcast } from "@/data/podcasts";
 import {
   breakingVisuals,
@@ -1313,6 +1316,9 @@ export function NowPlayingBar({
   onMinimize,
   onClose,
 }: NowPlayingBarProps) {
+  const social = useSocialItem(nowPlaying.id);
+  const [socialDialog, setSocialDialog] = useState<"comments" | "share" | "invite" | null>(null);
+
   return (
     <div
       data-testid="now-playing-bar"
@@ -1428,6 +1434,67 @@ export function NowPlayingBar({
             <Gauge className="h-4 w-4" />
             {playbackRate}×
           </button>
+
+          {/* Ações sociais estilo Spotify: curtir, comentar, compartilhar e
+              convidar amigos para assinar — sem banco (localStorage), com
+              eventos prontos para a futura sincronização. */}
+          <span
+            data-testid="podcast-social-actions"
+            className="hidden items-center gap-0.5 rounded-full border border-border bg-secondary/40 px-1 py-1 md:flex"
+          >
+            <button
+              type="button"
+              onClick={social.toggleLike}
+              aria-label={social.liked ? "Descurtir podcast" : "Curtir podcast"}
+              aria-pressed={social.liked}
+              title={social.liked ? "Descurtir" : "Curtir"}
+              className="flex h-8 items-center gap-1 rounded-full px-2 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Heart
+                className={cn(
+                  "h-4 w-4",
+                  social.liked ? "fill-red-500 text-red-500" : "",
+                )}
+              />
+              <span className="text-[11px] font-semibold tabular-nums">
+                {social.likesCount}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSocialDialog("comments")}
+              aria-label="Comentar podcast"
+              title="Comentar"
+              className="flex h-8 items-center gap-1 rounded-full px-2 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <MessageCircle className="h-4 w-4" />
+              {social.comments.length > 0 && (
+                <span className="text-[11px] font-semibold tabular-nums">
+                  {social.comments.length}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSocialDialog("share")}
+              aria-label="Compartilhar podcast"
+              title="Compartilhar"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Share2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSocialDialog("invite")}
+              aria-label="Convidar amigos para assinar"
+              title="Convidar para assinar"
+              className="flex h-8 items-center gap-1 rounded-full px-2 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span className="text-[11px] font-semibold">Convidar</span>
+            </button>
+          </span>
+
           <button
             type="button"
             onClick={onMinimize}
@@ -1447,6 +1514,31 @@ export function NowPlayingBar({
           </button>
         </div>
       </div>
+
+      {/* Diálogos sociais do episódio (portados ao <body> pelo próprio
+          componente — a barra com backdrop-blur enterraria um fixed). */}
+      {socialDialog === "comments" && (
+        <CommentDialog
+          publicationId={nowPlaying.id}
+          title={nowPlaying.title}
+          onClose={() => setSocialDialog(null)}
+        />
+      )}
+      {socialDialog === "share" && (
+        <ShareContentDialog
+          publicationId={nowPlaying.id}
+          title={nowPlaying.title}
+          message={`Ouça na Vitória News: ${nowPlaying.title}`}
+          onClose={() => setSocialDialog(null)}
+        />
+      )}
+      {socialDialog === "invite" && (
+        <InviteDialog
+          publicationId={nowPlaying.id}
+          title={nowPlaying.title}
+          onClose={() => setSocialDialog(null)}
+        />
+      )}
     </div>
   );
 }
