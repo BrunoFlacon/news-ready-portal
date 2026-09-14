@@ -215,6 +215,9 @@ export function YouTubePlayer({
 
   const [paused, setPaused] = useState(false);
   const [buffering, setBuffering] = useState(false);
+  // Dedos/mouse sobre a imagem: o botão central de play (estilo YouTube)
+  // aparece apenas quando o usuário passa o dedo sobre a capa do vídeo.
+  const [hovered, setHovered] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -580,6 +583,8 @@ export function YouTubePlayer({
       ref={containerRef}
       data-testid="youtube-player"
       onClick={handlePlayerClick}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
       className={cn(
         "group/player relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden",
         orientation === "vertical"
@@ -643,28 +648,35 @@ export function YouTubePlayer({
       )}
 
       {/*
-        Botão central de play, no estilo do play da capa:
-        fica sempre visível quando pausado e aparece no hover/toque enquanto toca.
+        Botão central de play, no estilo do play da capa do YouTube:
+        existe somente quando o vídeo tem capa (poster) e aparece quando o
+        usuário passa o dedo/mouse sobre a imagem.
       */}
-      <button
-        type="button"
-        data-testid="player-center-play"
-        aria-label="Reproduzir conteúdo"
-        onClick={(event) => {
-          event.stopPropagation();
-          togglePlay();
-        }}
-        className={cn(
-          "absolute inset-0 z-[2] flex items-center justify-center transition-opacity duration-200",
-          paused
-            ? "opacity-100"
-            : "pointer-events-none opacity-0 group-hover/player:pointer-events-auto group-hover/player:opacity-100",
-        )}
-      >
-        <span className="flex h-20 w-20 items-center justify-center rounded-full bg-brand/95 text-brand-foreground shadow-2xl ring-4 ring-white/25 transition-transform duration-200 group-hover:scale-110 md:h-24 md:w-24">
-          <Play className="h-9 w-9 translate-x-0.5 fill-current md:h-10 md:w-10" />
-        </span>
-      </button>
+      {poster && (
+        <button
+          type="button"
+          data-testid="player-center-play"
+          aria-label={paused ? "Reproduzir conteúdo" : "Pausar conteúdo"}
+          onClick={(event) => {
+            event.stopPropagation();
+            togglePlay();
+          }}
+          className={cn(
+            "absolute inset-0 z-[2] flex items-center justify-center transition-opacity duration-200",
+            hovered
+              ? "opacity-100"
+              : "pointer-events-none opacity-0",
+          )}
+        >
+          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-brand/95 text-brand-foreground shadow-2xl ring-4 ring-white/25 transition-transform duration-200 group-hover:scale-110 md:h-24 md:w-24">
+            {paused ? (
+              <Play className="h-9 w-9 translate-x-0.5 fill-current md:h-10 md:w-10" />
+            ) : (
+              <Pause className="h-9 w-9 fill-current md:h-10 md:w-10" />
+            )}
+          </span>
+        </button>
+      )}
 
       {/* Legenda (CC) sobre o vídeo — sem tarja preta, só sombra para contraste */}
       {cc && (

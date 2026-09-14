@@ -55,7 +55,14 @@
 }
 
 @layer components {
-  .page-band { @apply py-14 md:py-20; }
+  .page-band {
+    padding-top: 1rem;
+  }
+  @media (min-width: 768px) {
+    .page-band {
+      padding-bottom: 1rem;
+    }
+  }
   .editorial-kicker { @apply text-[10px] font-bold uppercase text-brand; letter-spacing: .16em; }
   .link-arrow { @apply inline-flex items-center gap-2 text-xs font-bold uppercase text-brand transition-colors hover:text-foreground; }
   .link-arrow svg { @apply h-4 w-4; }

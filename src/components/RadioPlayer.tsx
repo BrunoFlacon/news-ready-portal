@@ -52,8 +52,22 @@ import {
   type VisualFeedItem,
 } from "@/data/media";
 
+/**
+ * URL do stream da rádio ao vivo.
+ *
+ * Ordem de resolução:
+ *  1. VITE_RADIO_STREAM_URL configurada no ambiente (produção/CI);
+ *  2. URL padrão da transmissão (usada como fallback para que o botão
+ *     "Ouça a Rádio" nunca fique travado, mesmo em previews sem env);
+ *  3. string vazia — caso o ambiente defina explicitamente "", o player
+ *     permanece no modo "Em breve live".
+ */
 export function getRadioStreamUrl(): string {
-  return (import.meta.env.VITE_RADIO_STREAM_URL as string | undefined) || "";
+  const configured = import.meta.env.VITE_RADIO_STREAM_URL as string | undefined;
+  if (configured === undefined) {
+    return "https://shoutcast2.s12.com.br:16002/stream";
+  }
+  return configured;
 }
 
 export type NowPlayingKind = "live" | "podcast" | "video";

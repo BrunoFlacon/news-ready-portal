@@ -2,14 +2,14 @@
  * Integração com o WhatsApp da Web Rádio Vitória.
  *
  * O número pode ser configurado via VITE_WHATSAPP_NUMBER no arquivo .env;
- * sem configuração, usa o número padrão de demonstração.
+ * sem configuração, usa o número oficial da rádio como padrão.
  */
 
 /** Número do WhatsApp da rádio — configure VITE_WHATSAPP_NUMBER no .env. */
 export function getWhatsAppNumber(): string {
   return (
     (import.meta.env.VITE_WHATSAPP_NUMBER as string | undefined) ||
-    "5518999999999"
+    "55149999256955"
   );
 }
 

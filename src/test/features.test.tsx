@@ -721,7 +721,7 @@ describe("Home — player imersivo no banner gigante", () => {
     ).toBeInTheDocument();
   });
 
-  it("mostra o botão central de play quando pausado e reproduce ao tocar nele", () => {
+  it("mostra o botão central de play apenas ao passar o dedo sobre a capa (estilo YouTube)", () => {
     mockMedia();
     renderWithProviders(<Home />);
 
@@ -733,17 +733,18 @@ describe("Home — player imersivo no banner gigante", () => {
     const player = screen.getByTestId("youtube-player");
     const centerPlay = screen.getByTestId("player-center-play");
 
-    // O vídeo inicia tocando (autoplay mockado) — botão oculto.
+    // O vídeo inicia tocando (autoplay mockado) e o botão fica oculto até
+    // o dedo/mouse passar sobre a imagem — como o play da capa do YouTube.
     expect(centerPlay).toHaveClass("opacity-0");
 
-    // Pausar o vídeo (clique no player ou no play da barra) torna o botão visível.
-    fireEvent.click(player);
+    // Passar o dedo sobre a imagem revela o botão central.
+    fireEvent.pointerEnter(player);
     expect(centerPlay).not.toHaveClass("opacity-0");
 
-    // O botão central reproduz ao ser tocado.
+    // O botão central alterna play/pause ao ser tocado (o vídeo pausa).
     fireEvent.click(centerPlay);
-    expect(screen.getByRole("button", { name: /Pausar vídeo/i })).toBeInTheDocument();
-    expect(centerPlay).toHaveClass("opacity-0");
+    expect(screen.getByRole("button", { name: /Reproduzir vídeo/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reproduzir conteúdo" })).toBeInTheDocument();
   });
 
   it("pausa e reproduz o vídeo pelo botão central do player (estilo YouTube)", () => {
