@@ -327,39 +327,41 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 
 ### 3.5 Vídeos horizontais 16:9 apresentados como verticais 9:16 (respeitando o enquadramento)
 
-- **Problema:** vídeos 16:9 hoje são exibidos apenas no formato horizontal
-  preenchendo o banner. O editor quer que eles possam ser **enquadrados como
-  verticais 9:16** (padrão reels/Shorts) **sempre respeitando o enquadramento
-  original** — ou seja: sem cortar/distorcer o conteúdo e com toda a UI
-  (player, barra lateral de interação, superchat e comentários) seguindo a
-  experiência do YouTube.
-- **Causa raiz:** `YouTubePlayer.tsx` só tem dois modos de layout —
-  horizontal (`aspect-video`/`h-full w-full` com `object-cover`) e vertical
-  (`aspect-[9/16] h-full w-auto`); não há modo "encaixar 16:9 dentro de 9:16".
+- **Status:** ✅ implementado (TDD — Red→Green; teste novo na Onda 3.5).
+
+- **Problema:** vídeos 16:9 hoje exibidos apenas no formato horizontal, e o
+  editor quer que o usuário possa **alternar** um vídeo horizontal para o
+  modo **vertical 9:16** (reels/Shorts) — e voltar — a partir do próprio
+  player, **sem perder o enquadramento original** (o vídeo nunca é cortado
+  nem distorcido).
+- **Causa raiz:** `YouTubePlayer.tsx:188` — `orientation` é uma prop imutável
+  que define o container (`aspect-[9/16] h-full w-auto` vs `w-full`) e o
+  objeto do vídeo (`object-cover`/`object-contain`), mas não há **toggle do
+  usuário** para alternar a proporção em tempo real.
 - **Correção planejada:**
-  1. Adicionar modo de exibição do player acionável pelo usuário: botão de
-     alternância de proporção (reels/horizontal) na barra de controles
-     (junto ao teatro/tela cheia, `YouTubePlayer.tsx:551-565`);
-  2. No modo vertical 9:16 com vídeo 16:9:
-     - usar `object-contain` (não `cover`) sobre fundo escuro, para **nunca
-       cortar** o enquadramento original — padrão YouTube Shorts com vídeo
-       paisagem;
-     - ou `object-cover` opcional (preenche 9:16 cortando) apenas se o editor
-       aprovar, configurável por flag;
-  3. Garantir que a `SocialRail` (lateral direita), o `InlineComments` (item
-     3.3) e o superchat acompanhem o container vertical, sem esconder o vídeo;
-  4. Manter o comportamento em modo retrato no mobile: quando a tela é alta
-     (portrait), o 16:9 também entra no modo reels citado acima
-     (`media`/`useMediaQuery` para `orientation: portrait`).
-- **Arquivos:** `src/components/YouTubePlayer.tsx`; `src/pages/Home.tsx`
-  (WatchOverlay); `src/components/SocialDialogs.tsx` (rail/comentários se
-  adaptam ao modo vertical).
-- **Critério de aceite:** alternar para o modo 9:16 mantém o vídeo 16:9
-  totalmente visível (sem corte), as barras de interação ficam como em reels e
-  o layout segue o padrão YouTube em portrait e desktop.
-- **Teste afetado:** adicionar teste em `social-ui.test.tsx`/`features.test.tsx`
-  para a alternância de proporção preservar o `src` do vídeo e trocar as
-  classes de layout.
+  1. Adicionar no `WatchOverlay` de vídeos **horizontais** (`Home.tsx`)
+     um botão na barra de controles (junto ao teatro/tela cheia) que alterna
+     `vertical ↔ horizontal` — `aria-label` "Apresentar como reel (9:16)" /
+     "Apresentar em tela ampla (16:9)" com `aria-pressed`;
+  2. Ao alternar para vertical, o wrapper deixa de ser `w-full` e passa a
+     `aspect-[9/16] h-full w-auto`, e o vídeo usa `object-contain` sobre
+     fundo escuro — **enquadramento de pilar/letterbox preservado**, como o
+     YouTube Shorts estica vídeo paisagem;
+  3. O rail vertical (`SocialRail`), o `InlineComments` e o superchat
+     recolhem/reaparecem no mesmo container vertical (como no 9:16 nativo);
+  4. No mobile, quando `orientation: portrait` é detectado via
+     `useMediaQuery`, um vídeo horizontal também passa a ser exibido como
+     vertical 9:16 por padrão (mesmo reuso do item 3.3), mas ainda com o
+     botão para voltar a 16:9.
+- **Arquivos:** `src/pages/Home.tsx` (WatchOverlay — estado
+  `forcedVertical`); `src/components/YouTubePlayer.tsx` (prop
+  `orientation` já aceita horizontal/vertical).
+- **Critério de aceite:** ao clicar em "Apresentar como reel (9:16)", o
+  wrapper do player ganha `aspect-[9/16]`/`w-auto` mantendo o **mesmo
+  `src`** do vídeo e `object-contain`; clicar de novo em "Tela ampla
+  (16:9)" restaura. Nenhum reload/remoção do `<video>`.
+- **Teste afetado (TDD):** `features.test.tsx` — "alterna a proporção de um
+  vídeo horizontal para 9:16 (reel) e volta para 16:9 preservando o src".
 
 ---
 
@@ -435,7 +437,7 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 | --- | --- | --- |
 | 1 — Transporte do podcast | 1.1, 1.2 | `features.test.tsx` podcast (reescrever teste de velocidade) |
 | 2 — Rail vertical + preenchimento | 2.1, 2.2, 2.3, 3.1 | `social-ui.test.tsx` rail + inspeção visual |
-| 3 — Barras e comentários | 3.2 ✅, 3.3 ✅, 3.4 ✅, 3.5 | `social-ui.test.tsx` (teste de curtir com hover; painel inline; scroll ao banner; superchat) |
+| 3 — Barras e comentários | 3.2 ✅, 3.3 ✅, 3.4 ✅, 3.5 ✅ | `social-ui.test.tsx` (teste de curtir com hover; painel inline; scroll ao banner; superchat; reel 9:16) |
 | 4 — Mobile | 4.1, 4.2 | `npm run build` + auditoria manual em DevTools mobile (375px e 390px) |
 
 ## 6. Regras de execução

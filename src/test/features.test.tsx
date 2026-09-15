@@ -1229,8 +1229,51 @@ describe("Home — player imersivo no banner gigante", () => {
     expect(screen.queryByTestId("settings-menu")).not.toBeInTheDocument();
     expect(media.className).toContain("object-contain");
   });
-});
 
+  it("alterna a proporção de um vídeo horizontal 16:9 para vertical 9:16 (reel) e volta — preservando o src e nunca cortando o enquadramento (3.5)", async () => {
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    // Abre o vídeo embutido 16:9 (banner gigante horizontal padrão).
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Reproduzir Entenda o novo pacote de infraestrutura digital/i,
+      }),
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
+    });
+    const media = screen.getByTestId("watch-media") as HTMLMediaElement;
+    const mediaParent = media.parentElement!;
+    const srcBefore = media.getAttribute("src");
+
+    // O wrapper começa 16:9 (aspect-video / w-full — banner gigante horizontal).
+    expect(mediaParent.className).toMatch(/aspect-video|aspect-\[16\/9\]|w-full/);
+
+    // Botão na barra de controles alterna sem recarregar a mídia.
+    const reel = screen.getByRole("button", { name: /Alternar para reel 9:16/i });
+    expect(reel).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(reel);
+
+    // O wrapper vira 9:16 e a mídia mantém o MESMO src, com object-contain
+    // (nunca corta) + object-center — reenquadramento vertical estilo Shorts.
+    expect(mediaParent.className).toContain("aspect-[9/16]");
+    expect(media.className).toContain("object-contain");
+    expect(media.className).toContain("object-center");
+    expect(media.getAttribute("src")).toBe(srcBefore);
+    expect(reel).toHaveAttribute("aria-pressed", "true");
+
+    // Preservar enquadramento original: o vídeo NÃO é recortado (object-filled).
+    expect(media.className).not.toContain("object-cover");
+    expect(media.className).toContain("object-center");
+
+    // Volta para 16:9 — src continua intacto.
+    fireEvent.click(reel);
+    expect(mediaParent.className).not.toContain("aspect-[9/16]");
+    expect(media.getAttribute("src")).toBe(srcBefore);
+    expect(reel).toHaveAttribute("aria-pressed", "false");
+  });
+});
 describe("Home — área premium", () => {
   it("abre o painel ao escolher um podcast na íntegra (só data, hora, nome e apresentador)", () => {
     mockMedia();

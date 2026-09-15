@@ -236,6 +236,9 @@ export function YouTubePlayer({
   const [theater, setTheater] = useState(prefs.theater);
   const [fullscreen, setFullscreen] = useState(false);
   const [miniPlayer, setMiniPlayer] = useState(false);
+  // Modo reel: o wrapper 16:9 (padrão banner horizontal gigante) é reenquadrado
+  // para vertical 9:16 SEM recarregar a mídia e SEM nunca cortar o enquadramento.
+  const [reelMode, setReelMode] = useState(false);
 
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
@@ -587,48 +590,57 @@ export function YouTubePlayer({
       onPointerLeave={() => setHovered(false)}
       className={cn(
         "group/player relative flex h-full cursor-pointer items-center justify-center overflow-hidden",
-        orientation === "vertical"
-          ? "aspect-[9/16] h-full w-auto max-w-full rounded-lg bg-black shadow-2xl"
-          : "w-full rounded-lg",
+        reelMode
+          ? // Modo reel 9:16: o wrapper 16:9 do banner horizontAL é reenquadrado
+            // para vertical SEM recarregar a mídia (o src nunca muda).
+            "aspect-[9/16] h-full w-auto max-w-full rounded-lg bg-black shadow-2xl"
+          : orientation === "vertical"
+            ? "aspect-[9/16] h-full w-auto max-w-full rounded-lg bg-black shadow-2xl"
+            : "w-full rounded-lg",
+        reelMode && "mx-auto",
         scrubbing && "scrubbing",
         paused && "paused",
         fullscreen && "full-screen",
       )}
     >
-      <video
-        ref={videoRef}
-        key={src}
-        data-testid="watch-media"
-        src={src}
-        poster={poster}
-        playsInline
-        preload="auto"
-        onPlay={() => setPaused(false)}
-        onPause={() => setPaused(true)}
-        onTimeUpdate={(event) => {
-          const video = event.currentTarget;
-          setCurrentTime(video.currentTime);
-          setDuration(video.duration);
-          setProgress(video.duration > 0 ? video.currentTime / video.duration : 0);
-        }}
-        onLoadedData={(event) => setDuration(event.currentTarget.duration)}
-        onEnded={onEnded}
-        onVolumeChange={(event) => {
-          setMuted(event.currentTarget.muted);
-          setVolume(event.currentTarget.volume);
-        }}
-        onWaiting={handleWaiting}
-        onPlaying={() => setBuffering(false)}
-        onCanPlay={() => setBuffering(false)}
-        className={cn(
-          "pointer-events-none relative z-[1] h-full w-full",
-          orientation === "horizontal"
-            ? theater
-              ? "object-contain"
-              : "object-cover"
-            : "object-contain",
-        )}
-      />
+        <video
+          ref={videoRef}
+          key={src}
+          data-testid="watch-media"
+          src={src}
+          poster={poster}
+          playsInline
+          preload="auto"
+          onPlay={() => setPaused(false)}
+          onPause={() => setPaused(true)}
+          onTimeUpdate={(event) => {
+            const video = event.currentTarget;
+            setCurrentTime(video.currentTime);
+            setDuration(video.duration);
+            setProgress(video.duration > 0 ? video.currentTime / video.duration : 0);
+          }}
+          onLoadedData={(event) => setDuration(event.currentTarget.duration)}
+          onEnded={onEnded}
+          onVolumeChange={(event) => {
+            setMuted(event.currentTarget.muted);
+            setVolume(event.currentTarget.volume);
+          }}
+          onWaiting={handleWaiting}
+          onPlaying={() => setBuffering(false)}
+          onCanPlay={() => setBuffering(false)}
+          className={cn(
+            "pointer-events-none relative z-[1] h-full w-full",
+            reelMode
+              ? // Modo reel 9:16 — o vídeo horizontal NUNCA é recortado: usa
+                // object-contain + object-center (reenquadramento vertical).
+                "object-contain object-center"
+              : orientation === "horizontal"
+                ? theater
+                  ? "object-contain"
+                  : "object-cover"
+                : "object-contain",
+          )}
+        />
 
       {/* Thumbnail da capa durante o arraste no timeline (scrubbing) */}
       {scrubbing && poster && (
@@ -800,6 +812,23 @@ export function YouTubePlayer({
           >
             <Captions className="h-5 w-5" />
           </ControlButton>
+
+          {/* Modo reel 9:16: reenquadra o vídeo horizontal 16:9 em vertical SEM
+              recarregar a mídia e SEM nunca cortar (object-contain). */}
+          {orientation === "horizontal" && (
+            <ControlButton
+              label="Alternar para reel 9:16"
+              tooltip={
+                reelMode
+                  ? "Voltar ao modo paisagem 16:9"
+                  : "Reenquadrar como vídeo vertical 9:16"
+              }
+              pressed={reelMode}
+              onClick={() => setReelMode((value) => !value)}
+            >
+              <RectangleVertical className="h-5 w-5" />
+            </ControlButton>
+          )}
 
           {/* Configurações (⋮): qualidade, velocidade e exibição em um só botão */}
           <ControlButton
