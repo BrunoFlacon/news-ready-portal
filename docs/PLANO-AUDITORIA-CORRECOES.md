@@ -428,6 +428,14 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
   (seção de programação), `src/components/RadioPlayer.tsx` (NowPlayingBar).
 - **Critério de aceite:** em 360px de largura, nenhuma seção gera scroll
   horizontal; reels/stories/podcasts respeitam a tela com legenda intacta.
+- **Status:** ✅ **4.2 (overflow) implementado via TDD** — Red→Green:
+  `features.test.tsx` "4.2 — a main e o rail de mídia nunca estouram o
+  viewport (sem conteúdo passando)" EXIGE `main` com `overflow-x-clip`,
+  `min-w-0` e `max-w-full`; o **Green** aplicou essas classes em
+  `Layout.tsx` (`<main className="min-w-0 flex-1 max-w-full overflow-x-clip">`).
+  Os demais itens 4.1 (zoom, safe-area, 60fps, alvo de toque) são **auditoria
+  manual** em DevTools 375px/390px — fora do TDD em jsdom, anotados no
+  checklist da execução.
 
 ---
 
@@ -438,7 +446,7 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 | 1 — Transporte do podcast | 1.1, 1.2 | `features.test.tsx` podcast (reescrever teste de velocidade) |
 | 2 — Rail vertical + preenchimento | 2.1, 2.2, 2.3, 3.1 | `social-ui.test.tsx` rail + inspeção visual |
 | 3 — Barras e comentários | 3.2 ✅, 3.3 ✅, 3.4 ✅, 3.5 ✅ | `social-ui.test.tsx` (teste de curtir com hover; painel inline; scroll ao banner; superchat; reel 9:16) |
-| 4 — Mobile | 4.1, 4.2 | `npm run build` + auditoria manual em DevTools mobile (375px e 390px) |
+| 4 — Mobile | 4.2 (overflow) | `features.test.tsx` (main `overflow-x-clip`/`min-w-0`/`max-w-full`); 4.1 = auditoria manual em DevTools 375px/390px |
 
 ## 6. Regras de execução
 

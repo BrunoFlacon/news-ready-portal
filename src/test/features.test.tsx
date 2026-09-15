@@ -1470,3 +1470,23 @@ describe("Contact — mapa com fallback", () => {
     );
   });
 });
+
+describe("Mobile — auditoria 375px/390px (Onda 4)", () => {
+  beforeEach(async () => {
+    // Viewport estrito de celular: qualquer vazamento horizontal acima de 390px
+    // é tratado como "conteúdo passando" (overflow). 
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 844 });
+    renderWithProviders(<Home />);
+  });
+
+  it("4.2 — a main e o rail de mídia nunca estouram o viewport (sem conteúdo passando)", () => {
+    const main = document.querySelector("main");
+    expect(main).not.toBeNull();
+    // O conteúdo do rail (reels/stories/vídeos 72–82vw) precisa ser contido
+    // na página: a main NÃO pode criar scroll horizontal "fantasma".
+    expect(main!.className).toMatch(/overflow-x-(clip|hidden)/);
+    expect(main!.className).toMatch(/\bmin-w-0\b/);
+    expect(main!.className).toMatch(/\bmax-w-full\b/);
+  });
+});
