@@ -1,8 +1,10 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  ChevronDown,
   Crown,
   Heart,
   Lock,
+  MessageCircle,
   Mic2,
   Newspaper,
   Pause,
@@ -168,11 +170,13 @@ function WatchOverlay({
               )}
               {/* Painel de comentários na lateral ESQUERDA do vídeo (item 3.3),
                   alinhado ao player — na vertical ao lado do rail, na
-                  horizontal sobre o canto inferior esquerdo. */}
+                  horizontal sobre o canto inferior esquerdo. Em lives de vídeo
+                  (item 3.4) ganha a tarja "AO VIVO" (chat da transmissão). */}
               {commentsOpen && (
                 <InlineComments
                   publicationId={item.id}
                   title={item.title}
+                  live={item.kind === "live"}
                   onClose={() => setCommentsOpen(false)}
                   className={
                     vertical
@@ -215,6 +219,27 @@ function WatchOverlay({
           >
             <X className="h-4 w-4" />
           </button>
+
+          {/* Chat da transmissão (item 3.4): em lives de vídeo, botão no
+              canto direito abre/recolhe o painel de comentários à esquerda.
+              O mesmo botão alterna de "Comentar na transmissão" para
+              "Recolher comentários" com aria-pressed refletindo o estado. */}
+          {item.kind === "live" && (
+            <button
+              type="button"
+              onClick={() => setCommentsOpen((open) => !open)}
+              aria-label={commentsOpen ? "Recolher comentários" : "Comentar na transmissão"}
+              aria-pressed={commentsOpen}
+              title={commentsOpen ? "Recolher comentários" : "Comentar na transmissão"}
+              className="absolute bottom-32 right-4 z-20 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:text-brand lg:bottom-36 lg:right-6"
+            >
+              {commentsOpen ? (
+                <ChevronDown className="social-icon-shadow h-5 w-5" />
+              ) : (
+                <MessageCircle className="social-icon-shadow h-5 w-5" />
+              )}
+            </button>
+          )}
 
           {/* Título, descrição e "a seguir" (hover/toque; some após 10s) */}
           <div

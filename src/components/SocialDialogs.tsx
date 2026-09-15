@@ -436,9 +436,11 @@ interface InlineCommentsProps {
   onClose: () => void;
   /** Classes de posicionamento sobre o vídeo (vertical/horizontal). */
   className?: string;
+  /** Mostra a tarja "AO VIVO" no topo (chat de transmissão/superchat). */
+  live?: boolean;
 }
 
-export function InlineComments({ publicationId, title, onClose, className }: InlineCommentsProps) {
+export function InlineComments({ publicationId, title, onClose, className, live }: InlineCommentsProps) {
   const social = useSocialItem(publicationId);
   const [text, setText] = useState("");
   const listRef = useRef<HTMLUListElement>(null);
@@ -470,8 +472,19 @@ export function InlineComments({ publicationId, title, onClose, className }: Inl
       )}
     >
       <div className="flex items-center justify-between gap-2 rounded-t-xl border-b border-white/10 bg-neutral-900/90 px-3 py-2">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-300">
-          Comentários • {title}
+        <span className="flex min-w-0 items-center gap-2">
+          {live && (
+            <span
+              data-testid="inline-comments-live-badge"
+              className="inline-flex flex-shrink-0 items-center gap-1 rounded-sm bg-live px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-live-foreground"
+            >
+              <span className="h-1 w-1 animate-pulse rounded-full bg-live-foreground" />
+              AO VIVO
+            </span>
+          )}
+          <span className="truncate text-[10px] font-bold uppercase tracking-widest text-neutral-300">
+            Comentários • {title}
+          </span>
         </span>
         <button
           type="button"

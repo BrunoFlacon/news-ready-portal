@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { createPortal } from "react-dom";
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Headphones,
@@ -47,7 +48,12 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SITE_URL, whatsAppLink } from "@/lib/whatsapp";
 import { useSocialItem } from "@/lib/social";
-import { CommentDialog, InviteDialog, ShareContentDialog } from "@/components/SocialDialogs";
+import {
+  CommentDialog,
+  InlineComments,
+  InviteDialog,
+  ShareContentDialog,
+} from "@/components/SocialDialogs";
 import { podcasts, type Podcast } from "@/data/podcasts";
 import {
   breakingVisuals,
@@ -799,6 +805,7 @@ export function RadioPlayerBar({
   onMinimize,
 }: RadioPlayerBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [liked, setLiked] = useState(readStoredLiked);
   const [likesCount, setLikesCount] = useState(readLikesCount);
   const [requestOpen, setRequestOpen] = useState(false);
@@ -972,6 +979,28 @@ export function RadioPlayerBar({
               className="volume-slider h-24 w-1.5"
             />
           </div>
+        </div>
+
+        <div className="relative flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setChatOpen((value) => !value)}
+            aria-label={chatOpen ? "Recolher comentários" : "Comentar na transmissão"}
+            aria-pressed={chatOpen}
+            title={chatOpen ? "Recolher comentários" : "Comentar na transmissão"}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-300 transition-colors hover:text-white"
+          >
+            {chatOpen ? <ChevronDown className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />}
+          </button>
+          {chatOpen && (
+            <InlineComments
+              publicationId="radio-live"
+              title={upcomingLive?.title ?? "Rádio ao vivo"}
+              live
+              onClose={() => setChatOpen(false)}
+              className="absolute bottom-full right-0 z-[70] mb-2 w-80 max-w-[78vw] rounded-lg shadow-2xl"
+            />
+          )}
         </div>
 
         <div className="relative flex-shrink-0">

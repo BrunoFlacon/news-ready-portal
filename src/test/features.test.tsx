@@ -302,6 +302,35 @@ describe("RadioPlayer — barra ao vivo compacta (estilo Spotify)", () => {
     ).toBeInTheDocument();
   });
 
+  it("na rádio ao vivo, 'Comentar na transmissão' abre o chat acima da barra (com tarja AO VIVO) e recolhe", async () => {
+    renderBar();
+
+    const toggle = screen.getByRole("button", { name: "Comentar na transmissão" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(toggle);
+    // Painel de chat sobre a barra (overlay bottom-full no canto direito).
+    const panel = screen.getByTestId("inline-comments");
+    expect(panel.className).toContain("bottom-full");
+    expect(within(panel).getByText("AO VIVO")).toBeInTheDocument();
+
+    // Publica comentário no chat da transmissão.
+    fireEvent.change(
+      within(panel).getByRole("textbox", { name: "Escreva um comentário" }),
+      { target: { value: "Saudações de São Paulo!" } },
+    );
+    fireEvent.click(within(panel).getByRole("button", { name: "Publicar comentário" }));
+    await waitFor(() => {
+      expect(within(panel).getByText("Saudações de São Paulo!")).toBeInTheDocument();
+    });
+
+    // Recollhimento pelo mesmo botão → o painel sai do DOM e volta o abrir.
+    fireEvent.click(screen.getByRole("button", { name: "Recolher comentários" }));
+    await waitFor(() => {
+      expect(screen.queryByTestId("inline-comments")).not.toBeInTheDocument();
+    });
+  });
+
   it("'Pedir música' abre o diálogo e enviar o pedido abre o WhatsApp", () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     renderBar();

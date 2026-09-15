@@ -19,6 +19,12 @@
 >   rail/barra usam classe CSS própria `social-rail`/`social-bar` (o `p-2`/
 >   `bg-black/60` apareciam "desativadas" no DevTools) e ícones/contadores ganham
 >   sombra de contorno de 1px (`social-icon-shadow`/`social-count-shadow`).
+> - ✅ **Onda 3 parcial** (3.4) — **superchat ao vivo**: lives de vídeo ganham
+>   tarja "AO VIVO" no painel de comentários + botão no canto direito que alterna
+>   abrir/recolher (`MessageCircle`/`ChevronDown`) com `aria-pressed`; a **rádio
+>   ao vivo** (`RadioPlayerBar`) ganha botão "Comentar na transmissão" ao lado de
+>   "Mais opções" abrindo o chat como overlay acima da barra (`bottom-full` canto
+>   direito); comentários persistem via `useSocialItem`/`addComment`.
 
 Este plano cobre erros, bugs, lags e problemas de layout relatados pelo editor, com
 foco no player do banner gigante, nas barras sociais, no player de podcast e na
@@ -276,6 +282,8 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 
 ### 3.4 Superchat e comentários ao vivo (live vídeo + rádio ao vivo)
 
+- **Status:** ✅ implementado.
+
 - **Problema:** em lives (vídeo ao vivo e rádio/áudio ao vivo) não há chat ao
   vivo nem superchat. O editor quer: um **ícone de comentários** para o usuário
   clicar e comentar, e um **ícone para recolher/esconder** a aba de comentários
@@ -292,11 +300,22 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
      botão recolher com `aria-label="Recolher comentários"`;
   3. Os comentários usam a mesma fila de eventos (`useSocialItem`/`addComment`)
      já pronta para o banco (plano de banco: superchat via Mercado Pago).
+- **Implementação:** `InlineComments` ganhou a prop `live?: boolean` (tarja
+  "AO VIVO" no cabeçalho, barra `bg-live` com pulso); no `WatchOverlay` o
+  `InlineComments` recebe `live={item.kind === "live"}` e, para lives, um botão
+  flutuante no canto direito alterna `commentsOpen` com
+  `aria-label` "Comentar na transmissão"/"Recolher comentários" e `aria-pressed`;
+  na `RadioPlayerBar` há um botão ao lado de "Mais opções" que abre o
+  `InlineComments` como overlay `absolute bottom-full right-0` acima da barra
+  (`publicationId="radio-live"`, persiste em localStorage).
 - **Arquivos:** `src/pages/Home.tsx` (WatchOverlay live); `src/components/RadioPlayer.tsx`
-  (RadioPlayerBar + VideoBubble); `src/components/InlineComments.tsx` (novo).
+  (RadioPlayerBar); `src/components/SocialDialogs.tsx` (InlineComments).
 - **Critério de aceite:** na live de vídeo e na rádio, o ícone de comentário
   abre o chat, o ícone de recolher esconde a aba, e o estado abre/recolhido fica
   visível (aria-pressed). Comentar publica e persiste em localStorage.
+- **Testes:** `social-ui.test.tsx` → "Superchat e comentários ao vivo (Onda
+  3.4) — live de vídeo"; `features.test.tsx` → "na rádio ao vivo, 'Comentar na
+  transmissão' abre o chat acima da barra (com tarja AO VIVO) e recolhe".
 
 ---
 
@@ -410,7 +429,7 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 | --- | --- | --- |
 | 1 — Transporte do podcast | 1.1, 1.2 | `features.test.tsx` podcast (reescrever teste de velocidade) |
 | 2 — Rail vertical + preenchimento | 2.1, 2.2, 2.3, 3.1 | `social-ui.test.tsx` rail + inspeção visual |
-| 3 — Barras e comentários | 3.2 ✅, 3.3 ✅, 3.4, 3.5 | `social-ui.test.tsx` (teste de curtir com hover; painel inline; scroll ao banner) |
+| 3 — Barras e comentários | 3.2 ✅, 3.3 ✅, 3.4 ✅, 3.5 | `social-ui.test.tsx` (teste de curtir com hover; painel inline; scroll ao banner; superchat) |
 | 4 — Mobile | 4.1, 4.2 | `npm run build` + auditoria manual em DevTools mobile (375px e 390px) |
 
 ## 6. Regras de execução

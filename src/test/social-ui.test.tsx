@@ -308,3 +308,43 @@ describe("Ferramentas sociais — barra de podcast (estilo Spotify)", () => {
     expect(screen.getByRole("button", { name: "Descurtir podcast" })).toBeInTheDocument();
   });
 });
+
+describe("Superchat e comentários ao vivo (Onda 3.4) — live de vídeo", () => {
+  it("na live de vídeo o painel inline abre com tarja AO VIVO e o botão recolhe", async () => {
+    renderWithProviders(<Home />);
+    const grid = screen.getByTestId("schedule-grid");
+    fireEvent.click(
+      within(grid).getByRole("button", { name: /Culto de adoração ao vivo/i }),
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
+    });
+
+    // O controle de chat ao vivo fica no canto direito (abrir/recolher).
+    const toggle = screen.getByRole("button", { name: "Comentar na transmissão" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(toggle);
+    const panel = screen.getByTestId("inline-comments");
+    // Painel à esquerda com a tarja "AO VIVO" (superchat de video live).
+    expect(panel.className).toContain("left-4");
+    expect(within(panel).getByText("AO VIVO")).toBeInTheDocument();
+    // O mesmo botão agora vira "recolher" e marca o estado aberto.
+    expect(screen.getByRole("button", { name: "Recolher comentários" })).toHaveAttribute("aria-pressed", "true");
+
+    // Publica um comentário no chat ao vivo.
+    fireEvent.change(within(panel).getByRole("textbox", { name: "Escreva um comentário" }), {
+      target: { value: "Vocês estão ao vivo agora?" },
+    });
+    fireEvent.click(within(panel).getByRole("button", { name: "Publicar comentário" }));
+    await waitFor(() => {
+      expect(within(panel).getByText("Vocês estão ao vivo agora?")).toBeInTheDocument();
+    });
+
+    // Recolhe escondendo o painel e restaura o botão de abrir.
+    fireEvent.click(screen.getByRole("button", { name: "Recolher comentários" }));
+    await waitFor(() => {
+      expect(screen.queryByTestId("inline-comments")).not.toBeInTheDocument();
+    });
+  });
+});
