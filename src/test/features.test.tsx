@@ -695,6 +695,25 @@ describe("Home — player imersivo no banner gigante", () => {
     expect(screen.getByTestId("watch-caption")).toHaveTextContent(/Legenda do áudio/i);
   });
 
+  it("ao escolher um reel/story, a tela rola suavemente até o banner gigante", () => {
+    mockMedia();
+    const scrollIntoView = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Assistir Inteligência artificial na saúde/i,
+      }),
+    );
+
+    expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
+    // O banner gigante (hero) ganha um ref e é rolado via scrollIntoView.
+    expect(scrollIntoView).toHaveBeenCalledWith(
+      expect.objectContaining({ behavior: "smooth", block: "start" }),
+    );
+  });
+
   it("reproduz a live no banner ao clicar na linha da programação", () => {
     mockMedia();
     renderWithProviders(<Home />);

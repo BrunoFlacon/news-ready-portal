@@ -55,7 +55,7 @@ describe("Ferramentas sociais — barra horizontal (YouTube fullscreen)", () => 
     expect(screen.getByRole("button", { name: "Convidar amigos para assinar" })).toBeInTheDocument();
   });
 
-  it("curtir na barra alterna o estado e persiste (localStorage)", async () => {
+  it("curtir na barra alterna o estado, esconde visualmente e reaparece no hover", async () => {
     renderWithProviders(<Home />);
     const video = videoItem ?? watchFeed[0];
     fireEvent.click(screen.getByRole("button", { name: new RegExp(`Reproduzir ${video.title}`) }));
@@ -63,15 +63,22 @@ describe("Ferramentas sociais — barra horizontal (YouTube fullscreen)", () => 
       expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
     });
 
-    // Clica em curtir → a barra some (hideSocialBar) e a curtida persiste no localStorage.
+    // Barra visível antes de curtir (sem pointer-events-none).
+    expect(screen.getByTestId("social-bar").className).not.toContain("pointer-events-none");
+
+    // Clica em curtir → a barra esconde visualmente (continua no DOM) e a
+    // curtida persiste no localStorage.
     fireEvent.click(screen.getByRole("button", { name: "Curtir publicação" }));
-    // A barra social some porque o usuário já curtiu.
     await waitFor(() => {
-      expect(screen.queryByTestId("social-bar")).not.toBeInTheDocument();
+      expect(screen.getByTestId("social-bar").className).toContain("pointer-events-none");
     });
-    // Estado persistido no localStorage.
     expect(window.localStorage.getItem(`social.liked.${video.id}`)).toBe("1");
     expect(window.localStorage.getItem(`social.likes.total.${video.id}`)).toBe("1");
+
+    // Passar o mouse sobre o vídeo faz a barra reaparecer clicável.
+    fireEvent.mouseEnter(screen.getByTestId("watch-overlay"));
+    expect(screen.getByTestId("social-bar").className).not.toContain("pointer-events-none");
+    expect(screen.getByRole("button", { name: "Compartilhar publicação" })).toBeInTheDocument();
   });
 });
 
@@ -102,7 +109,7 @@ describe("Ferramentas sociais — rail vertical (Instagram)", () => {
 });
 
 describe("Ferramentas sociais — conversas e convites", () => {
-  it("abre o diálogo de comentários e publica um comentário", async () => {
+  it("abre o painel de comentários na lateral esquerda e publica um comentário", async () => {
     renderWithProviders(<Home />);
     const video = videoItem ?? watchFeed[0];
     fireEvent.click(screen.getByRole("button", { name: new RegExp(`Reproduzir ${video.title}`) }));
@@ -112,7 +119,7 @@ describe("Ferramentas sociais — conversas e convites", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Comentar publicação" }));
     await waitFor(() => {
-      expect(screen.getByTestId("comment-dialog")).toBeInTheDocument();
+      expect(screen.getByTestId("inline-comments")).toBeInTheDocument();
     });
 
     fireEvent.change(
@@ -120,11 +127,33 @@ describe("Ferramentas sociais — conversas e convites", () => {
       { target: { value: "Que conteúdo incrível!" } },
     );
     fireEvent.click(screen.getByRole("button", { name: "Publicar comentário" }));
-    // O diálogo permanece aberto mesmo depois que a barra some (hidden).
-    // Aguarda a re-renderização assíncrona do hook useSocialItem.
+    // O comentário publica e o painel permanece aberto sobre o vídeo.
     await waitFor(() => {
       expect(screen.getByText("Que conteúdo incrível!")).toBeInTheDocument();
     });
+
+    // Fecha o painel pelo botão dedicado.
+    fireEvent.click(screen.getByRole("button", { name: "Fechar comentários" }));
+    await waitFor(() => {
+      expect(screen.queryByTestId("inline-comments")).not.toBeInTheDocument();
+    });
+  });
+
+  it("no reel vertical o painel de comentários abre na lateral esquerda sobre o vídeo", async () => {
+    renderWithProviders(<Home />);
+    const reel = reelItem ?? watchFeed.find((item) => item.orientation === "vertical")!;
+    openReel(reel.title);
+    await waitFor(() => {
+      expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Comentar publicação" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("inline-comments")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("inline-comments").className).toContain("left-3");
+    // O rail continua acessível ao lado do painel de comentários.
+    expect(screen.getByTestId("social-rail")).toBeInTheDocument();
   });
 
   it("abre o diálogo de convite; cada convite vira evento na fila", async () => {
@@ -168,9 +197,30 @@ describe("Auditoria layout (Onda 2) — rail e vídeos", () => {
     expect(rail.className).not.toContain("border");
     expect(rail.className).not.toContain("px-2.5");
     expect(rail.className).not.toContain("py-4");
-    // Substituição limpa e determinística.
-    expect(rail).toHaveClass("bg-black/60");
-    expect(rail).toHaveClass("rounded-2xl");
+    // `p-2`/`bg-black/60` ficavam "desativadas" no DevTools (sobrescritas);
+    // agora a classe CSS própria `.social-rail` garante padding/fundo fixos.
+    expect(rail.className).not.toContain("p-2");
+    expect(rail.className).not.toContain("bg-black/60");
+    expect(rail).toHaveClass("social-rail");
+  });
+
+  it("ícones e contadores do rail têm sombra de contorno de 1px (contraste no fundo claro)", async () => {
+    renderWithProviders(<Home />);
+    const reel = reelItem ?? watchFeed.find((item) => item.orientation === "vertical")!;
+    openReel(reel.title);
+    await waitFor(() => {
+      expect(screen.getByTestId("watch-overlay")).toBeInTheDocument();
+    });
+
+    const rail = screen.getByTestId("social-rail");
+    const likeButton = within(rail).getByRole("button", { name: "Curtir publicação" });
+    // O SVG deve ter a classe de sombra "sutil" para não sumir em fundos claros.
+    const heartIcon = likeButton.querySelector("svg");
+    expect(heartIcon).not.toBeNull();
+    expect(heartIcon!.getAttribute("class")).toContain("social-icon-shadow");
+    // O número do contador também recebe sombra de texto.
+    const count = within(likeButton).getByTestId("social-likes-count");
+    expect(count.className).toContain("social-count-shadow");
   });
 
   it("contadores ficam à ESQUERDA do ícone no rail vertical (item 2.2)", async () => {

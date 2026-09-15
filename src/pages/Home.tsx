@@ -11,13 +11,13 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { Layout } from "@/components/Layout";
 import { MediaRail } from "@/components/MediaRail";
 import { YouTubePlayer } from "@/components/YouTubePlayer";
 import { Button } from "@/components/ui/button";
-import { SocialBar, SocialRail } from "@/components/SocialDialogs";
+import { InlineComments, SocialBar, SocialRail } from "@/components/SocialDialogs";
 import { trackView, useSocialItem } from "@/lib/social";
 import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
 import { extractPalette, type AmbientPalette } from "@/lib/ambient";
@@ -98,9 +98,29 @@ function WatchOverlay({
   const vertical = item.orientation === "vertical";
 
   // Barra horizontal some depois que o visitante curte ou comenta o conteúdo;
-  // no rail vertical o comportamento permanece (sempre sobre o vídeo).
+  // reaparece quando o mouse volta sobre o vídeo (item 3.2). O rail vertical
+  // permanece sempre sobre o vídeo.
   const social = useSocialItem(item.id);
-  const hideSocialBar = social.liked || social.comments.length > 0;
+  const [barCollapsed, setBarCollapsed] = useState(false);
+  useEffect(() => {
+    // A barra colapsa assim que há interação social (curtir/comentar).
+    if (social.liked || social.comments.length > 0) {
+      setBarCollapsed(true);
+    }
+  }, [social.liked, social.comments.length]);
+
+  // Painel inline de comentários à esquerda do vídeo (item 3.3).
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  useEffect(() => {
+    // Ao trocar de vídeo, o painel fecha para recomeçar limpo.
+    setCommentsOpen(false);
+  }, [item.id]);
+
+  // Mostrar a UI sempre desfaz o colapso da barra (hover/toque/clique).
+  const showUi = useCallback(() => {
+    setBarCollapsed(false);
+    onShowUi();
+  }, [onShowUi]);
 
   // Tempo de visualização: acumula o tempo em exibição por publicação
   // (métrica "view" — v0 sem banco; pronta para sincronização futura).
@@ -117,9 +137,10 @@ function WatchOverlay({
       data-testid="watch-overlay"
       className="fixed inset-0 z-[90] lg:absolute lg:inset-0 lg:z-30"
       style={{ "--ambient-a": ambient.a, "--ambient-b": ambient.b } as CSSProperties}
-      onMouseEnter={onShowUi}
+      onMouseEnter={showUi}
       onMouseLeave={onHideUi}
-      onTouchStart={onShowUi}
+      onTouchStart={showUi}
+      onClick={showUi}
     >
       {!transitioning && (
         <>
@@ -142,7 +163,24 @@ function WatchOverlay({
                 onToggleCc={onToggleCc}
                 onEnded={onEnded}
               />
-              {vertical && <SocialRail publicationId={item.id} title={item.title} />}
+              {vertical && (
+                <SocialRail publicationId={item.id} title={item.title} onOpenComments={() => setCommentsOpen(true)} />
+              )}
+              {/* Painel de comentários na lateral ESQUERDA do vídeo (item 3.3),
+                  alinhado ao player — na vertical ao lado do rail, na
+                  horizontal sobre o canto inferior esquerdo. */}
+              {commentsOpen && (
+                <InlineComments
+                  publicationId={item.id}
+                  title={item.title}
+                  onClose={() => setCommentsOpen(false)}
+                  className={
+                    vertical
+                      ? "left-3 top-1/2 z-30 max-h-[70%] -translate-y-1/2"
+                      : "bottom-20 left-4 z-30 max-h-[60%] lg:bottom-24 lg:left-6"
+                  }
+                />
+              )}
             </div>
           </div>
 
@@ -196,11 +234,17 @@ function WatchOverlay({
           </div>
 
           {/* Ferramentas sociais: no formato horizontal a barra fica no canto
-              direito e some depois que o visitante curte ou comenta; no
-              formato vertical o rail vive dentro do wrapper do vídeo
-              (colado à borda direita do player). */}
+              direito e recolhe (mantendo a transição) depois que o visitante
+              curte ou comenta — reaparece no hover/toque/clique; no formato
+              vertical o rail vive dentro do wrapper do vídeo (colado à borda
+              direita do player). */}
           {!vertical && (
-            <SocialBar publicationId={item.id} title={item.title} hidden={hideSocialBar} />
+            <SocialBar
+              publicationId={item.id}
+              title={item.title}
+              visible={uiVisible && !barCollapsed}
+              onOpenComments={() => setCommentsOpen(true)}
+            />
           )}
         </>
       )}
@@ -301,6 +345,7 @@ function RadioHero({
   onEnded,
   onAutoPlay,
   onPremiumRequest,
+  bannerRef,
 }: {
   watch: WatchState | null;
   onPlay: (item: WatchFeedItem) => void;
@@ -308,6 +353,7 @@ function RadioHero({
   onEnded: () => void;
   onAutoPlay: () => void;
   onPremiumRequest: (target: PremiumTarget) => void;
+  bannerRef?: React.RefObject<HTMLElement | null>;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [ambient, setAmbient] = useState<AmbientPalette>({ a: "#7c2d12", b: "#1c1917" });
@@ -395,6 +441,7 @@ function RadioHero({
 
   return (
     <section
+      ref={bannerRef}
       className="relative min-h-[640px] overflow-hidden border-b border-border md:min-h-[700px]"
       aria-label="Rádio ao vivo"
     >
@@ -823,6 +870,10 @@ export default function Home() {
   const [watch, setWatch] = useState<WatchState | null>(null);
   const [premium, setPremium] = useState<PremiumTarget | null>(null);
 
+  // Referência ao banner gigante: ao escolher um reel/story na faixa de
+  // entretenimento, a página rola suavemente até aqui antes de abrir o player.
+  const bannerRef = useRef<HTMLElement | null>(null);
+
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -866,6 +917,8 @@ export default function Home() {
     (id: string) => {
       const item = watchFeed.find((entry) => entry.id === id);
       if (item) {
+        // Rola suavemente até o banner gigante e reproduz o vídeo escolhido.
+        bannerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         playNow(item);
       }
     },
@@ -888,6 +941,7 @@ export default function Home() {
         onEnded={handleEnded}
         onAutoPlay={autoPlayNext}
         onPremiumRequest={openPremium}
+        bannerRef={bannerRef}
       />
       <ProgrammingSection onPlay={playNow} onPremium={openPremium} />
       <EntertainmentBand onSelectId={selectWatchById} />

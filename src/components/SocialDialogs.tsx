@@ -11,7 +11,7 @@
  * via `createPortal` (o overlay com `backdrop-blur` cria um containing
  * block que enterraria um modal `fixed inset-0`).
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Bookmark,
@@ -299,43 +299,51 @@ function DialogShell({ testId, ariaLabel, kicker, title, onClose, children }: Di
 interface SocialBarProps {
   publicationId: string;
   title: string;
-  /** Esconde a barra visualmente (ex.: após curtir/comentar) mas mantém
-      os diálogos montados para que o usuário veja o que acabou de fazer. */
-  hidden?: boolean;
+  /** Mantém a barra montada no DOM (para animar) e só alterna uma classe
+      `pointer-events-none`/`opacity-0` quando invisível — assim ela fica
+      pronta para reaparecer no hover/toque do visitante. */
+  visible?: boolean;
+  /** Chamado quando o visitante pede os comentários (o painel inline sobre o
+      vídeo é controlado pelo player; o diálogo fica como fallback p/ podcast). */
+  onOpenComments?: () => void;
 }
 
-export function SocialBar({ publicationId, title, hidden }: SocialBarProps) {
+export function SocialBar({ publicationId, title, visible = true, onOpenComments }: SocialBarProps) {
   const social = useSocialItem(publicationId);
   const [dialog, setDialog] = useState<"comments" | "share" | "invite" | null>(null);
 
   return (
     <>
-      {!hidden && (
-        <div
-          data-testid="social-bar"
-          className="absolute bottom-20 right-4 z-20 flex items-center gap-1 rounded-full bg-black/60 px-2 py-1.5 lg:bottom-24 lg:right-6"
-        >
+      <div
+        data-testid="social-bar"
+        className={cn(
+          "social-bar absolute bottom-20 right-4 z-20 flex items-center gap-1 transition-opacity duration-300 lg:bottom-24 lg:right-6",
+          visible ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+      >
         <SocialIconButton
           label={social.liked ? "Descurtir publicação" : "Curtir publicação"}
           pressed={social.liked}
           onClick={social.toggleLike}
         >
-          <Heart className={cn("h-[18px] w-[18px]", social.liked && "fill-red-500 text-red-500")} />
+          <Heart className={cn("h-[18px] w-[18px] social-icon-shadow", social.liked && "fill-red-500 text-red-500")} />
           <SocialCount value={social.likesCount} testId="social-likes-count" />
         </SocialIconButton>
-        <SocialIconButton label="Comentar publicação" onClick={() => setDialog("comments")}>
-          <MessageCircle className="h-[18px] w-[18px]" />
+        <SocialIconButton
+          label="Comentar publicação"
+          onClick={() => (onOpenComments ? onOpenComments() : setDialog("comments"))}
+        >
+          <MessageCircle className="h-[18px] w-[18px] social-icon-shadow" />
           <SocialCount value={social.comments.length} testId="social-comments-count" />
         </SocialIconButton>
         <SocialIconButton label="Compartilhar publicação" onClick={() => setDialog("share")}>
-          <Share2 className="h-[18px] w-[18px]" />
+          <Share2 className="h-[18px] w-[18px] social-icon-shadow" />
         </SocialIconButton>
         <SocialIconButton label="Convidar amigos para assinar" onClick={() => setDialog("invite")}>
-          <UserPlus className="h-[18px] w-[18px]" />
+          <UserPlus className="h-[18px] w-[18px] social-icon-shadow" />
           <span className="text-[11px] font-semibold">Convidar</span>
         </SocialIconButton>
       </div>
-      )}
 
       {dialog === "comments" && <CommentDialog publicationId={publicationId} title={title} onClose={() => setDialog(null)} />}
       {dialog === "share" && (
@@ -358,17 +366,19 @@ export function SocialBar({ publicationId, title, hidden }: SocialBarProps) {
 interface SocialRailProps {
   publicationId: string;
   title: string;
+  /** Comentários abrem no painel inline à esquerda do vídeo (item 3.3). */
+  onOpenComments?: () => void;
 }
 
-export function SocialRail({ publicationId, title }: SocialRailProps) {
+export function SocialRail({ publicationId, title, onOpenComments }: SocialRailProps) {
   const social = useSocialItem(publicationId);
-  const [dialog, setDialog] = useState<"comments" | "share" | "invite" | null>(null);
+  const [dialog, setDialog] = useState<"share" | "invite" | null>(null);
 
   return (
     <>
       <div
         data-testid="social-rail"
-        className="absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col items-stretch gap-3 rounded-2xl bg-black/60 p-2"
+        className="social-rail absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col items-stretch gap-3"
       >
         <SocialIconButton
           label={social.liked ? "Descurtir publicação" : "Curtir publicação"}
@@ -376,28 +386,30 @@ export function SocialRail({ publicationId, title }: SocialRailProps) {
           onClick={social.toggleLike}
         >
           <SocialCount value={social.likesCount} testId="social-likes-count" className="min-w-6 text-right" />
-          <Heart className={cn("h-[22px] w-[22px]", social.liked && "fill-red-500 text-red-500")} />
+          <Heart className={cn("h-[22px] w-[22px] social-icon-shadow", social.liked && "fill-red-500 text-red-500")} />
         </SocialIconButton>
-        <SocialIconButton label="Comentar publicação" onClick={() => setDialog("comments")}>
+        <SocialIconButton
+          label="Comentar publicação"
+          onClick={() => (onOpenComments ? onOpenComments() : setDialog("comments"))}
+        >
           <SocialCount value={social.comments.length} testId="social-comments-count" className="min-w-6 text-right" />
-          <MessageCircle className="h-[22px] w-[22px]" />
+          <MessageCircle className="h-[22px] w-[22px] social-icon-shadow" />
         </SocialIconButton>
         <SocialIconButton label="Compartilhar publicação" onClick={() => setDialog("share")}>
-          <Share2 className="h-[22px] w-[22px]" />
+          <Share2 className="h-[22px] w-[22px] social-icon-shadow" />
         </SocialIconButton>
         <SocialIconButton
           label={social.saved ? "Remover dos salvos" : "Salvar publicação"}
           pressed={social.saved}
           onClick={social.toggleSave}
         >
-          <Bookmark className={cn("h-[22px] w-[22px]", social.saved && "fill-brand text-brand")} />
+          <Bookmark className={cn("h-[22px] w-[22px] social-icon-shadow", social.saved && "fill-brand text-brand")} />
         </SocialIconButton>
         <SocialIconButton label="Convidar amigos para assinar" onClick={() => setDialog("invite")}>
-          <UserPlus className="h-[22px] w-[22px]" />
+          <UserPlus className="h-[22px] w-[22px] social-icon-shadow" />
         </SocialIconButton>
       </div>
 
-      {dialog === "comments" && <CommentDialog publicationId={publicationId} title={title} onClose={() => setDialog(null)} />}
       {dialog === "share" && (
         <ShareContentDialog
           publicationId={publicationId}
@@ -408,6 +420,114 @@ export function SocialRail({ publicationId, title }: SocialRailProps) {
       )}
       {dialog === "invite" && <InviteDialog publicationId={publicationId} title={title} onClose={() => setDialog(null)} />}
     </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Painel inline de comentários (item 3.3)                                    */
+/* - Fica sobre o vídeo, alinhado à ESQUERDA (na vertical sobre o reel, na     */
+/*   horizontal acima da barra de ações), para não competir com o rail/barra.  */
+/* - Lista, campo de texto e envio em um só painel; fechar pelo X.             */
+/* -------------------------------------------------------------------------- */
+
+interface InlineCommentsProps {
+  publicationId: string;
+  title: string;
+  onClose: () => void;
+  /** Classes de posicionamento sobre o vídeo (vertical/horizontal). */
+  className?: string;
+}
+
+export function InlineComments({ publicationId, title, onClose, className }: InlineCommentsProps) {
+  const social = useSocialItem(publicationId);
+  const [text, setText] = useState("");
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // Sempre rola para o comentário mais recente quando a lista cresce.
+  useEffect(() => {
+    const list = listRef.current;
+    if (list) {
+      list.scrollTop = list.scrollHeight;
+    }
+  }, [social.comments.length]);
+
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return;
+    }
+    social.addComment(trimmed);
+    setText("");
+  };
+
+  return (
+    <div
+      data-testid="inline-comments"
+      className={cn(
+        "social-comments-panel flex w-72 max-w-[70%] flex-col justify-end rounded-xl border border-white/10",
+        className,
+      )}
+    >
+      <div className="flex items-center justify-between gap-2 rounded-t-xl border-b border-white/10 bg-neutral-900/90 px-3 py-2">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-300">
+          Comentários • {title}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar comentários"
+          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-white/10 hover:text-white"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <ul
+        ref={listRef}
+        data-testid="comment-list"
+        className="max-h-44 space-y-2 overflow-y-auto bg-neutral-900/90 px-3 py-3"
+      >
+        {social.comments.length === 0 && (
+          <li className="rounded-md border border-white/10 bg-neutral-800 px-3 py-2.5 text-xs text-neutral-400">
+            Nenhum comentário ainda. Seja a primeira pessoa a comentar!
+          </li>
+        )}
+        {social.comments.map((comment) => (
+          <li
+            key={comment.id}
+            className="flex items-start gap-2.5 rounded-md border border-white/10 bg-neutral-800 px-3 py-2.5"
+          >
+            <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-brand/20 text-brand">
+              <MessageCircle className="h-3 w-3" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs leading-relaxed text-neutral-100">{comment.text}</p>
+              <time className="text-[10px] text-neutral-500">
+                {new Date(comment.createdAt).toLocaleString("pt-BR")}
+              </time>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <form onSubmit={submit} className="flex gap-2 rounded-b-xl border-t border-white/10 bg-neutral-900/90 p-3">
+        <input
+          aria-label="Escreva um comentário"
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          placeholder="Escreva um comentário…"
+          className="min-w-0 flex-1 rounded-md border border-white/10 bg-neutral-800 px-3 py-2 text-sm text-white placeholder:text-neutral-500 focus:border-brand focus:outline-none"
+        />
+        <button
+          type="submit"
+          aria-label="Publicar comentário"
+          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-brand text-brand-foreground transition-colors hover:bg-accent"
+        >
+          <Send className="h-4 w-4" />
+        </button>
+      </form>
+    </div>
   );
 }
 
@@ -439,7 +559,7 @@ function SocialIconButton({ label, pressed, onClick, children }: SocialIconButto
 
 function SocialCount({ value, testId, className }: { value: number; testId: string; className?: string }) {
   return (
-    <span data-testid={testId} className={cn("text-[11px] font-semibold tabular-nums", className)}>
+    <span data-testid={testId} className={cn("social-count-shadow text-[11px] font-semibold tabular-nums", className)}>
       {value > 0 ? value : ""}
     </span>
   );
