@@ -10,6 +10,15 @@
 >   (sem backdrop-blur/shadow/border) e contadores à esquerda dos ícones; reels 9:16
 >   preenchem a altura do banner e vídeos 16:9 voltam a preencher a tela (regressão do
 >   wrapper `relative` corrigida com `h-full w-full` + `w-fit` no vertical).
+> - ✅ **Onda 3 parcial** (3.2, 3.3) — commit `91b0737` — barra horizontal recolhe
+>   (`pointer-events-none opacity-0`) após curtir/comentar e **reaparece no
+>   hover/toque/clique**; comentários abrem em **painel inline à esquerda do vídeo**
+>   (lista + campo + enviar + fechar, rolagem para o novo comentário) no 16:9 e no
+>   9:16, substituindo o diálogo central no player; ao escolher reel/story na faixa
+>   de entretenimento a página **rola suavemente até o banner** (`scrollIntoView`);
+>   rail/barra usam classe CSS própria `social-rail`/`social-bar` (o `p-2`/
+>   `bg-black/60` apareciam "desativadas" no DevTools) e ícones/contadores ganham
+>   sombra de contorno de 1px (`social-icon-shadow`/`social-count-shadow`).
 
 Este plano cobre erros, bugs, lags e problemas de layout relatados pelo editor, com
 foco no player do banner gigante, nas barras sociais, no player de podcast e na
@@ -89,16 +98,18 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 
 ### 2.1 CSS do rail: apagar classes "desativadas" e aplicar configuração limpa
 
-- **Status:** ✅ implementado (Onda 2, commit `7249c54`).
+- **Status:** ✅ implementado (Onda 2, commit `7249c54` + Onda 3, commit `91b0737`).
 - **Problema:** o editor inspecionou o elemento `[data-testid="social-rail"]` e
   encontrou várias regras CSS marcadas como desativadas/sobrescritas
   (`/* ... */` no DevTools): `backdrop-blur-md`, `shadow-2xl`, `border`,
   `border-white/10`, `bg-black/50`, `px-2.5`, `py-4` — além de um
   `element.style { padding-top: unset; padding-right: 0px }` vindo de herança
-  conflitante. O projeto usa **Tailwind v3 + PostCSS** (`src/index.css` com
-  `@tailwind base/components/utilities`), portanto o "desativado" entre `/* */`
-  no DevTools equivale a regra de utilitário sobrescrita por outro seletor ou
-  por `element.style` inline (ex.: `padding` herdado de outro componente).
+  conflitante. Na Onda 3, o mesmo sintoma apareceu para `p-2` e `bg-black/60`
+  no rail **e na barra horizontal**: o editor reportou as regras `/* ... */`
+  no DevTools dos vídeos verticais 9:16. O projeto usa **Tailwind v3 + PostCSS**
+  (`src/index.css` com `@tailwind base/components/utilities`), portanto o
+  "desativado" entre `/* */` no DevTools equivale a regra de utilitário
+  sobrescrita por outro seletor ou por `element.style` inline.
 - **Causa raiz:** `SocialDialogs.tsx:369-372` — classe longa
   `"absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center
   gap-4 rounded-full border border-white/10 bg-black/50 px-2.5 py-4 shadow-2xl
@@ -108,21 +119,22 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 - **Correção planejada:**
   1. **Apagar** as classes utilitárias com comportamento frágil no rail:
      `backdrop-blur-md`, `shadow-2xl`, `border`, `border-white/10`, `px-2.5`,
-     `py-4`;
-  2. Usar classes simples e determinísticas: `absolute right-3 top-1/2 z-20
-     flex -translate-y-1/2 flex-col items-stretch gap-3 rounded-2xl bg-black/60
-     p-2` (sem backdrop-filter, sem shadow — o fundo `bg-black/60` já dá o
-     contraste);
+     `py-4` (Onda 2);
+  2. **Definitivo (Onda 3):** extrair `padding`/`border-radius`/`background`
+     para classes CSS próprias fora do `@layer` — `.social-rail` (rail) e
+     `.social-bar` (barra horizontal) no final de `src/index.css`, no mesmo
+     padrão de `.max-w-3xl` — assim **nenhum** utilitário `p-2`/`bg-black/60`
+     fica mais sujeito a ser "desativado" por precedência de camadas;
   3. Garantir que **nenhum** `element.style` inline seja aplicado no componente
      (remover qualquer `style=` residual e evitar herança de `padding` via CSS
      reset no PostCSS — verificar `src/index.css` e `tailwind` config);
   4. Revisar o mesmo tratamento no `SocialBar` (`SocialDialogs.tsx:316`), que
-     usa `backdrop-blur-md` + `shadow-2xl` com o mesmo risco.
-- **Arquivos:** `src/components/SocialDialogs.tsx`; `src/index.css` (se precisar
-  de um `.social-rail` utilitário); `tailwind.config.ts`/`postcss.config.js`.
-- **Critério de aceite:** no DevTools, o `social-rail` não exibe regras
-  desativadas entre `/* */` e não há `element.style` sobrescrevendo padding;
-  visual idêntico entre md/desktop e mobile.
+     usava `backdrop-blur-md` + `shadow-2xl` com o mesmo risco.
+- **Arquivos:** `src/components/SocialDialogs.tsx`; `src/index.css` (classes
+  `.social-rail`/`.social-bar`); `tailwind.config.ts`/`postcss.config.js`.
+- **Critério de aceite:** no DevTools, o `social-rail` (e `social-bar`) não
+  exibem regras desativadas entre `/* */` e não há `element.style` sobrescrevendo
+  padding; visual idêntico entre md/desktop e mobile.
 
 ---
 
@@ -202,6 +214,8 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 
 ### 3.2 Barra horizontal (curtir/comentar/compartilhar/indicar) reaparece no hover
 
+- **Status:** ✅ implementado (Onda 3, commit `91b0737`).
+
 - **Problema:** depois de curtir, a barra some **permanentemente**
   (`hideSocialBar = social.liked || social.comments.length > 0`) e o visitante
   não consegue mais compartilhar/comentar/indicar.
@@ -230,6 +244,8 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 ---
 
 ### 3.3 Comentários estilo YouTube (lateral esquerda, rolagem de baixo para cima)
+
+- **Status:** ✅ implementado (Onda 3, commit `91b0737`).
 
 - **Problema:** hoje os comentários abrem em **diálogo central** (`CommentDialog`,
   `SocialDialogs.tsx:41-104`). O editor quer o padrão YouTube: painel de
@@ -394,7 +410,7 @@ de arquivo:linha) → correção planejada → arquivos afetados → critério d
 | --- | --- | --- |
 | 1 — Transporte do podcast | 1.1, 1.2 | `features.test.tsx` podcast (reescrever teste de velocidade) |
 | 2 — Rail vertical + preenchimento | 2.1, 2.2, 2.3, 3.1 | `social-ui.test.tsx` rail + inspeção visual |
-| 3 — Barras e comentários | 3.2, 3.3, 3.4, 3.5 | `social-ui.test.tsx` (reescrever teste de curtir; novo painel inline; modo reels) |
+| 3 — Barras e comentários | 3.2 ✅, 3.3 ✅, 3.4, 3.5 | `social-ui.test.tsx` (teste de curtir com hover; painel inline; scroll ao banner) |
 | 4 — Mobile | 4.1, 4.2 | `npm run build` + auditoria manual em DevTools mobile (375px e 390px) |
 
 ## 6. Regras de execução
