@@ -19,6 +19,12 @@
 >   rail/barra usam classe CSS própria `social-rail`/`social-bar` (o `p-2`/
 >   `bg-black/60` apareciam "desativadas" no DevTools) e ícones/contadores ganham
 >   sombra de contorno de 1px (`social-icon-shadow`/`social-count-shadow`).
+> - ✅ **Onda 3 parcial** (3.4, commit `55ddae1`) — **superchat ao vivo**: lives de
+>   vídeo ganham tarja "AO VIVO" no painel de comentários e botão no canto direito
+>   que alterna abrir/recolher (`MessageCircle`/`ChevronDown`, `aria-pressed`); a
+>   rádio ao vivo (`RadioPlayerBar`) ganha botão "Comentar na transmissão" abrindo
+>   o chat como overlay acima da barra (canto direito, `bottom-full`); comentários
+>   persistem via `useSocialItem`/`addComment`.
 > - ✅ **Onda 3 parcial** (3.4) — **superchat ao vivo**: lives de vídeo ganham
 >   tarja "AO VIVO" no painel de comentários + botão no canto direito que alterna
 >   abrir/recolher (`MessageCircle`/`ChevronDown`) com `aria-pressed`; a **rádio
