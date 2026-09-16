@@ -19,12 +19,14 @@ import { Layout } from "@/components/Layout";
 import { MediaRail } from "@/components/MediaRail";
 import VisualCardsRail from "@/components/VisualCardsRail";
 import { YouTubePlayer } from "@/components/YouTubePlayer";
+import { AdSpot, type AdCampaign } from "@/components/AdSpot";
 import { Button } from "@/components/ui/button";
 import { InlineComments, SocialBar, SocialRail } from "@/components/SocialDialogs";
 import { trackView, useSocialItem } from "@/lib/social";
 import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
 import { extractPalette, type AmbientPalette } from "@/lib/ambient";
 import { podcasts } from "@/data/podcasts";
+import { pickAdCampaign } from "@/data/ads";
 import {
   institutionalServices,
   schedule,
@@ -61,8 +63,9 @@ export interface PremiumTarget {
 }
 
 type WatchPlaying = { item: WatchFeedItem; phase: "playing" };
+type WatchAd = { item: WatchFeedItem; phase: "ad"; next: WatchFeedItem; ad: AdCampaign };
 type WatchTransition = { item: WatchFeedItem; phase: "transition"; next: WatchFeedItem };
-type WatchState = WatchPlaying | WatchTransition;
+type WatchState = WatchPlaying | WatchAd | WatchTransition;
 
 /* -------------------------------------------------------------------------- */
 /* Player imersivo do banner gigante                                         */
@@ -79,6 +82,7 @@ interface WatchOverlayProps {
   onHideUi: () => void;
   onClose: () => void;
   onEnded: () => void;
+  onAdDone: () => void;
   onPremiumRequest: (target: PremiumTarget) => void;
 }
 
@@ -93,10 +97,13 @@ function WatchOverlay({
   onHideUi,
   onClose,
   onEnded,
+  onAdDone,
   onPremiumRequest,
 }: WatchOverlayProps) {
   const { item, phase } = watch;
   const transitioning = phase === "transition";
+  const inAd = phase === "ad";
+  const ad = phase === "ad" ? watch.ad : null;
   const next = phase === "transition" ? watch.next : null;
   const vertical = item.orientation === "vertical";
 
@@ -156,16 +163,20 @@ function WatchOverlay({
               ficar colado à borda direita do VÍDEO — e não da tela. */}
           <div className="absolute inset-0 z-10 flex h-full w-full items-center justify-center">
             <div className={cn("relative h-full", vertical ? "w-fit max-w-full" : "w-full")}>
-              <YouTubePlayer
-                src={item.videoUrl}
-                poster={item.image}
-                caption={item.caption}
-                orientation={item.orientation}
-                cc={cc}
-                showControls={uiVisible}
-                onToggleCc={onToggleCc}
-                onEnded={onEnded}
-              />
+              {inAd && ad ? (
+                <AdSpot ad={ad} onSkip={onAdDone} onComplete={onAdDone} />
+              ) : (
+                <YouTubePlayer
+                  src={item.videoUrl}
+                  poster={item.image}
+                  caption={item.caption}
+                  orientation={item.orientation}
+                  cc={cc}
+                  showControls={uiVisible}
+                  onToggleCc={onToggleCc}
+                  onEnded={onEnded}
+                />
+              )}
               {vertical && (
                 <SocialRail publicationId={item.id} title={item.title} onOpenComments={() => setCommentsOpen(true)} />
               )}
@@ -369,6 +380,7 @@ function RadioHero({
   onPlay,
   onCloseWatch,
   onEnded,
+  onAdDone,
   onAutoPlay,
   onPremiumRequest,
   bannerRef,
@@ -377,6 +389,7 @@ function RadioHero({
   onPlay: (item: WatchFeedItem) => void;
   onCloseWatch: () => void;
   onEnded: () => void;
+  onAdDone: () => void;
   onAutoPlay: () => void;
   onPremiumRequest: (target: PremiumTarget) => void;
   bannerRef?: React.RefObject<HTMLElement | null>;
@@ -590,6 +603,7 @@ function RadioHero({
           onHideUi={() => setUiVisible(false)}
           onClose={onCloseWatch}
           onEnded={onEnded}
+          onAdDone={onAdDone}
           onPremiumRequest={onPremiumRequest}
         />
       )}
@@ -926,7 +940,19 @@ export default function Home() {
       }
       const index = watchRecommendations.findIndex((item) => item.id === prev.item.id);
       const next = watchRecommendations[(index + 1) % watchRecommendations.length];
-      return { item: prev.item, phase: "transition", next };
+      // Onda 6 (item 1.1): entre o fim deste e o próximo, o anúncio
+      // intersticial entra em cena (fase "ad"); ao pular/terminar, a casa
+      // segue para a transição existente — o próximo nunca é bloqueado.
+      return { item: prev.item, phase: "ad", next, ad: pickAdCampaign(index < 0 ? 0 : index) };
+    });
+  }, []);
+
+  const handleAdDone = useCallback(() => {
+    setWatch((prev) => {
+      if (!prev || prev.phase !== "ad") {
+        return prev;
+      }
+      return { item: prev.item, phase: "transition", next: prev.next };
     });
   }, []);
 
@@ -965,6 +991,7 @@ export default function Home() {
         onPlay={playNow}
         onCloseWatch={closeWatch}
         onEnded={handleEnded}
+        onAdDone={handleAdDone}
         onAutoPlay={autoPlayNext}
         onPremiumRequest={openPremium}
         bannerRef={bannerRef}

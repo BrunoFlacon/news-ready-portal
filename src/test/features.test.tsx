@@ -803,6 +803,13 @@ describe("Home — player imersivo no banner gigante", () => {
     const media = screen.getByTestId("watch-media") as HTMLVideoElement;
     fireEvent(media, new Event("ended"));
 
+    // Onda 6 (1.1): antes da transição, o intersticial entra em tela cheia com
+    // contagem regressiva e "Pular anúncio" — fecha sozinho após 5s.
+    expect(screen.getByTestId("ad-interstitial")).toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+
     // Transição: manchete + capa do próximo vídeo recomendado (story-3).
     expect(screen.getByTestId("watch-transition")).toBeInTheDocument();
     expect(screen.getByTestId("watch-next-card")).toBeInTheDocument();
