@@ -1519,3 +1519,129 @@ describe("Mobile — auditoria 375px/390px (Onda 4)", () => {
     expect(main!.className).toMatch(/\bmax-w-full\b/);
   });
 });
+
+// ===========================================================================
+// ONDA 5.3 — menu "⋮" por CARD de vídeo/live (fecha a Onda 5).
+// Requisitos da UAT 5.3:
+//   • todo card de vídeo/reel/story/stories TEM um botão de menu ⋮ PRÓPRIO
+//     (por card — não apenas o menu global do player em repouso);
+//   • ao abrir o ⋮ de um card: descrição curta + data/hora da publicação
+//     (pt-BR) — e, para LIVE, o PICO de audiência da transmissão;
+//   • o ⋮ de QUALQUER card mostra o ENGAJAMENTO SOMADO
+//     (curtidas + comentários + compartilhamentos) com rótulo "Total".
+// Red(2): hoje os cards de vídeo/reel/story da Home e as lives tocam direto
+// (sem ⋮ por card) — estes testids NÃO existem ⇒ Red(2) legítimo.
+// ===========================================================================
+describe("Onda 5.3 — menu ⋮ por card de vídeo/live", () => {
+  const KINDS = ["video", "reel", "story", "live"] as const;
+
+  beforeEach(() => {
+    renderWithProviders(<Home />);
+  });
+
+  it("5.3.1 — todo card de vídeo/reel/story/live expõe ⋮ PRÓPRIO (`${kind}-card-menu`)", () => {
+    for (const kind of KINDS) {
+      expect(screen.getAllByTestId(`${kind}-card-menu`).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("5.3.2 — abrir o ⋮ mostra descrição curta + data/hora pt-BR do card", () => {
+    fireEvent.click(screen.getAllByTestId("video-card-menu")[0]);
+    expect(screen.getByTestId("video-card-menu-description")).toHaveTextContent(/.+/);
+    expect(screen.getByTestId("video-card-menu-datetime")).toHaveTextContent(
+      /\d{2}\/\d{2}\/\d{4}\s*·\s*\d{2}:\d{2}/,
+    );
+  });
+
+  it("5.3.3 — o ⋮ de LIVE mostra o pico de audiência da transmissão", () => {
+    fireEvent.click(screen.getAllByTestId("live-card-menu")[0]);
+    const peak = screen.getByTestId("live-card-menu-peak");
+    expect(peak).toHaveTextContent(/pico de audi[eê]ncia/i);
+    expect(peak).toHaveTextContent(/\d{1,3}(\.\d{3})*\s*ouvinte/i);
+  });
+
+  it("5.3.4 — o ⋮ de QUALQUER card mostra o engajamento somado (curtidas+coment+compart) com rótulo 'Total'", () => {
+    for (const kind of KINDS) {
+      fireEvent.click(screen.getAllByTestId(`${kind}-card-menu`)[0]);
+      const engagement = screen.getByTestId(`${kind}-card-menu-engagement`);
+      expect(engagement).toHaveTextContent(/total/i);
+      expect(engagement).toHaveTextContent(
+        /\d{1,3}(\.\d{3})*\s*curtidas?\s*\+\s*\d{1,3}(\.\d{3})*\s*coment[iá]rios?\s*\+\s*\d{1,3}(\.\d{3})*\s*compartilhamentos?/i,
+      );
+    }
+  });
+});
+
+// ===========================================================================
+// ONDA 5.3 — menu "⋮" por CARD de vídeo/live (cada card é independente).
+// Requisitos da UAT 5.3:
+//   • todo card de vídeo/live/reel/story tem um botão de menu ⋮ próprio
+//     (descritivo pela mídia, NÃO apenas o menu global do player);
+//   • o menu mostra: descrição curta, data/hora da publicação,
+//     pico de audiência (ao vivo) e engajamento SOMADO
+//     (curtidas + comentários + compartilhamentos).
+// Red(2): os testids abaixo NÃO existem — cada card de vídeo/live hoje
+// renderiza apenas `li > button` com ímã de reprodução (sem menu ⋮ por card).
+// ===========================================================================
+describe("Onda 5.3 — menu ⋮ por card de vídeo/live", () => {
+  beforeEach(() => {
+    renderWithProviders(<Home />);
+  });
+
+  const kinds = ["video", "live", "reel", "story"] as const;
+
+  it("todo card de vídeo/live/reel/story expõe botão de menu ⋮ próprio (por card)", () => {
+    // Hoje o card é um botão "clique para tocar" sem menu ⋮ por card — o
+    // Red(2) força o botão ⋮ a existir em CADA card, com testid por tipo.
+    for (const kind of kinds) {
+      expect(screen.getByTestId(`${kind}-card-menu`)).toBeInTheDocument();
+      expect(screen.getByTestId(`${kind}-card-menu`)).toBeEnabled();
+    }
+  });
+
+  it("ao abrir o menu ⋮ do card, ele exibe descrição + data/hora da publicação", () => {
+    // Descrição: frase-resumo do conteúdo (não só o título).
+    // Data/hora: formato pt-BR (dd/mm/aaaa, hh:mm).
+    fireEvent.click(screen.getByTestId("video-card-menu"));
+    expect(screen.getByTestId("video-card-menu-description")).toHaveTextContent(
+      /.+/,
+    );
+    expect(screen.getByTestId("video-card-menu-datetime")).toHaveTextContent(
+      /\d{2}\/\d{2}\/\d{4}.+\d{2}:\d{2}/,
+    );
+  });
+
+  it("o menu ⋮ de LIVE mostra o pico de audiência da transmissão", () => {
+    fireEvent.click(screen.getByTestId("live-card-menu"));
+    expect(screen.getByTestId("live-card-menu-peak")).toHaveTextContent(
+      /pico de audiência/i,
+    );
+    expect(screen.getByTestId("live-card-menu-peak")).toHaveTextContent(
+      /\d{1,3}(\.\d{3})* ouvinte/i,
+    );
+  });
+
+  it("o menu ⋮ de QUALQUER card mostra engajamento SOMADO (curtidas+comentários+compartilhamentos)", () => {
+    for (const kind of kinds) {
+      fireEvent.click(screen.getByTestId(`${kind}-card-menu`));
+      const engagement = screen.getByTestId(`${kind}-card-menu-engagement`);
+      expect(engagement).toHaveTextContent(/engajamento/i);
+      expect(engagement).toHaveTextContent(
+        /\d{1,3}(\.\d{3})*\s*(curtida|comentário|compartilhamento)/i,
+      );
+      // soma visível: apenas um número grande somando os três canais
+      expect(engagement).toHaveTextContent(/total/i);
+    }
+  });
+
+  it("o menu ⋮ NÃO modifica o fluxo «Assistir vídeos, reels e stories» nem exibe botão-premium fantasma", () => {
+    // Abrir o menu ⋮ de um card cria um popover/portal de 320px, nunca um
+    // modal em tela cheia, e não ativa a camada premium (crown) apenas por
+    // abrir menu — a assinatura continua sendo um convite explicitado.
+    fireEvent.click(screen.getByTestId("story-card-menu"));
+    expect(screen.queryByTestId("premium-panel")).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId(/watch-overlay/)).toHaveLength(0);
+    // o rail continua listando os mesmos 3 primeiros vídeos do feed
+    expect(screen.getAllByTestId(/breaking-visual-item/)).toHaveLength(3);
+  });
+});

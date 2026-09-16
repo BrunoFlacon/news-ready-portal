@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { cn } from "@/lib/utils";
 import { Layout } from "@/components/Layout";
 import { MediaRail } from "@/components/MediaRail";
+import VisualCardsRail from "@/components/VisualCardsRail";
 import { YouTubePlayer } from "@/components/YouTubePlayer";
 import { Button } from "@/components/ui/button";
 import { InlineComments, SocialBar, SocialRail } from "@/components/SocialDialogs";
@@ -968,7 +969,8 @@ export default function Home() {
         onPremiumRequest={openPremium}
         bannerRef={bannerRef}
       />
-      <ProgrammingSection onPlay={playNow} onPremium={openPremium} />
+      <VisualCardsRail />
+    <ProgrammingSection onPlay={playNow} onPremium={openPremium} />
       <EntertainmentBand onSelectId={selectWatchById} />
       <InstitutionalBand />
       {premium && <PremiumPanel target={premium} onClose={() => setPremium(null)} />}

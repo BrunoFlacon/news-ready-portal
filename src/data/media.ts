@@ -65,6 +65,17 @@ export interface VisualFeedItem {
   audioUrl?: string;
   videoUrl?: string;
   duration?: string;
+  /**
+   * Campos aditivos do menu ⋮ por card (Onda 5.3). Todos opcionais para não
+   * quebrar dados que apenas preenchem os campos originais.
+   */
+  description?: string;
+  /** Momento da publicação em pt-BR (dd/mm/aaaa · hh:mm). */
+  publishedAt?: string;
+  /** Engajamento somado do card: curtidas + comentários + compartilhamentos. */
+  engagement?: { likes: number; comments: number; shares: number };
+  /** Pico de audiência (somente live) em ouvintes. */
+  peakAudience?: number;
 }
 
 const demoAudio = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3";
