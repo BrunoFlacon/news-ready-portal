@@ -50,8 +50,20 @@ export function SiteHeader() {
 
         <div className="relative flex items-center gap-2 lg:gap-6">
           {isLiveOnAir && (
-            <span className="hidden items-center gap-2 text-xs font-semibold uppercase text-live lg:inline-flex">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-live" />Ao vivo
+            <span className="hidden flex-col items-start gap-0.5 text-live lg:inline-flex">
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-live" />Ao vivo
+              </span>
+              {/* Onda 5 — índice compacto de ouvintes: aparece só quando a
+                  rádio está no ar ao vivo; some ao desligar o player. */}
+              {player.listeners != null && (
+                <span
+                  data-testid="live-listeners"
+                  className="text-[10px] font-medium tabular-nums"
+                >
+                  {player.listeners.toLocaleString("pt-BR")} ouvintes
+                </span>
+              )}
             </span>
           )}
 

@@ -437,6 +437,35 @@ describe("RadioPlayer — 'Ouça a Rádio' no cabeçalho", () => {
     const audio = screen.getByTestId("live-audio");
     fireEvent(audio, new Event("play"));
     expect(within(header).getByText("Ao vivo")).toBeInTheDocument();
+
+    // Onda 5 — contador de ouvintes: enquanto a transmissão ao vivo toca, o
+    // cabeçalho mostra, compactamente abaixo do "Ao vivo", quantos ouvintes
+    // estão acompanhando a rádio ao vivo naquele momento.
+    expect(within(header).getByTestId("live-listeners")).toHaveTextContent(
+      /\d+\s*ouvintes?/i,
+    );
+  });
+
+  it("ao fechar o player, o contador de ouvintes some do cabeçalho", () => {
+    vi.stubEnv("VITE_RADIO_STREAM_URL", "https://stream.example.com/live");
+    mockMedia();
+    renderWithProviders(<Home />);
+
+    const header = screen.getByRole("banner");
+    fireEvent.click(
+      within(header).getByRole("button", { name: /Ouça a Rádio/i }),
+    );
+    const audio = screen.getByTestId("live-audio");
+    fireEvent(audio, new Event("play"));
+
+    // Com a transmissão ao vivo ativa, o contador fica visível.
+    expect(within(header).getByTestId("live-listeners")).toBeInTheDocument();
+
+    // Fechar a transmissão esconde o índice de ouvintes do cabeçalho.
+    fireEvent.click(screen.getByRole("button", { name: /Fechar player/i }));
+    expect(
+      within(header).queryByTestId("live-listeners"),
+    ).not.toBeInTheDocument();
   });
 });
 

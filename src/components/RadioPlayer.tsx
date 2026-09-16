@@ -16,7 +16,7 @@
  *    escolhido em 3 segundos, um vídeo/reel/story "breaking" recomendado
  *    começa a tocar automaticamente em um card flutuante.
  */
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import {
   Check,
@@ -102,6 +102,9 @@ export interface RadioPlayerApi {
   streamUrl: string;
   liveOpen: boolean;
   livePlaying: boolean;
+  /** Ouvintes acompanhando a transmissão ao vivo agora (null = fora do ar).
+      Na Onda 5 é dado de demonstração até o backend 5.7 entrar no ar. */
+  listeners: number | null;
   liveError: boolean;
   nowPlaying: NowPlaying | null;
   playbackPlaying: boolean;
@@ -143,6 +146,13 @@ export function useRadioPlayer(): RadioPlayerApi {
   const liveAudioRef = useRef<HTMLAudioElement>(null);
   const npAudioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Onda 5 — contagem de demonstração de ouvintes ao vivo (substituída pelo
+  // backend `transmission_audience.current_listeners`, seção 5.7 do plano).
+  const demoLiveListeners = useMemo(
+    () => 142 + Math.floor(Math.random() * 47),
+    [],
+  );
 
   const [liveOpen, setLiveOpen] = useState(false);
   const [livePlaying, setLivePlaying] = useState(false);
@@ -470,6 +480,10 @@ export function useRadioPlayer(): RadioPlayerApi {
     streamUrl,
     liveOpen,
     livePlaying,
+    // Onda 5 — ouvintes ao vivo: índice de demonstração enquanto a transmissão
+    // toca, `null` quando a rádio é desligada (o cabeçalho só renderiza o
+    // contador quando `listeners != null`).
+    listeners: livePlaying ? demoLiveListeners : null,
     liveError,
     nowPlaying,
     playbackPlaying,

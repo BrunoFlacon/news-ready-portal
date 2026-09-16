@@ -157,6 +157,7 @@ Convenção: chaves `uuid` (padrão gen_random_uuid), timestamps `timestamptz`, 
 | `reactions` | id, user_id, program_id, kind (`live_reaction|emoji`), icon, created_at | reações em programa (gravado/ao vivo) |
 | `superchats` | id, user_id, program_id, live_id (opcional), message, amount_cents, currency, color/level, status (`pending|approved|hidden`), payment_id, created_at | **Superchat** (seção 7) |
 | `payments` | id, user_id, provider (`mercado_pago|stripe|paypal|bitpay|coinbase|nowpayments|pix`), currency (`BRL|USD|BTC|ETH|…`), amount_cents/amount_sats, status, gateway_id | pagamentos (superchat, assinatura) — via adapters |
+| `transmission_audience` | id, transmission_id, medium (`radio|fb_live|yt_live|ig_live|podcast`), current_listeners, peak_listeners, measured_at, source | **ouvintes/espectadores atuais + pico por transmissão** (rádio ao vivo e vídeo live) — batida 1×/min via heartbeat |
 
 ### 5.6 Agregações e relatórios
 
@@ -167,6 +168,8 @@ Convenção: chaves `uuid` (padrão gen_random_uuid), timestamps `timestamptz`, 
 | `v_daily_counts` | View | série diária de cada métrica (gráficos Recharts) |
 | `v_user_profiles` | View | relatório individualizado: demográficos + resumo de interações + fonte de aquisição |
 | `v_audience_devices` | View | estatística por dispositivo/meio e por rede social |
+| `v_engagement_by_content` | View | **engajamento somado (curtidas + comentários + compartilhamentos) individualizado por tipo de conteúdo e por post** |
+| `v_peak_audience` | View | **pico de audiência por transmissão ao vivo (rádio/live)** a partir da batida de `transmission_audience` |
 | função `run_user_report(user_id)` | SQL | relatório completo de um usuário (exportável CSV) |
 
 ---
