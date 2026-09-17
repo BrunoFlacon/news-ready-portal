@@ -13,20 +13,20 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { Layout } from "@/components/Layout";
 import { MediaRail } from "@/components/MediaRail";
 import VisualCardsRail from "@/components/VisualCardsRail";
 import { YouTubePlayer } from "@/components/YouTubePlayer";
-import { AdSpot, type AdCampaign } from "@/components/AdSpot";
+import { AdSpot, DEFAULT_SKIP_AFTER_MS, type AdCampaign } from "@/components/AdSpot";
 import { Button } from "@/components/ui/button";
 import { InlineComments, SocialBar, SocialRail } from "@/components/SocialDialogs";
 import { trackView, useSocialItem } from "@/lib/social";
 import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
 import { extractPalette, type AmbientPalette } from "@/lib/ambient";
 import { podcasts } from "@/data/podcasts";
-import { pickAdCampaign } from "@/data/ads";
+import { featuredAdCampaigns, pickAdCampaign } from "@/data/ads";
 import {
   institutionalServices,
   schedule,
@@ -45,6 +45,9 @@ const TRANSITION_MS = 12000;
 const AD_STEP_MS = 4000;
 const UI_HIDE_MS = 10000;
 const WATCH_CC_STORAGE_KEY = "radio.watch.cc";
+/** Duração do slide de publicidade no banner (item 1.2) antes de voltar ao
+ *  conteúdo — o usuário pode pular antes com "Pular anúncio". */
+const HERO_AD_SKIP_MS = 10000;
 
 /** Descrição curta exibida no carrossel e no painel de informações do player. */
 const watchBlurb = (item: WatchFeedItem) =>
@@ -411,20 +414,89 @@ function RadioHero({
     });
   }, []);
 
-  const active = watchFeed[activeIndex % watchFeed.length];
-  // Quando a manchete tem matéria vinculada, a capa abre o artigo para leitura.
-  const articleLink = active.articleId ? `/artigo/${active.articleId}` : null;
+  // Item 1.2 — o carrossel une as manchetes (`watchFeed`) e os anúncios
+  // `featured` (slides patrocinados "empurrados" para a posição de hero).
+  const carouselItems = useMemo(
+    () => [...watchFeed, ...featuredAdCampaigns()] as Array<WatchFeedItem | AdCampaign>,
+    [],
+  );
+  const active = carouselItems[activeIndex % carouselItems.length];
+  const isAdSlide = active !== undefined && "featured" in active && active.featured === true;
+  const activeAd = isAdSlide ? (active as AdCampaign) : null;
+  const firstAdIndex = carouselItems.findIndex(
+    (item) => "featured" in item && item.featured === true,
+  );
 
-  // Rotação automática dos destaques — suspensa enquanto o banner é usado.
+  // Quando a manchete tem matéria vinculada, a capa abre o artigo para leitura.
+  const activeMedia = isAdSlide ? watchFeed[0] : (active as WatchFeedItem);
+  const articleLink = isAdSlide ? null : activeMedia.articleId ? `/artigo/${activeMedia.articleId}` : null;
+
+  // Contador regressivo do slide patrocinado (item 1.2): o play automático é
+  // pausado e o slide ganha "Pular anúncio" depois de 5s. Ao zerar, volta ao
+  // primeiro slide de conteúdo.
+  const [adRemaining, setAdRemaining] = useState(HERO_AD_SKIP_MS);
   useEffect(() => {
-    if (watch) {
+    if (!isAdSlide) {
+      return;
+    }
+    setAdRemaining(HERO_AD_SKIP_MS);
+    const timer = window.setInterval(() => {
+      setAdRemaining((ms) => Math.max(0, ms - 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isAdSlide]);
+
+  // Rotação automática dos destaques — suspensa enquanto o banner é usado e
+  // enquanto o slide atual é publicidade (o contador assume o controle).
+  useEffect(() => {
+    if (watch || isAdSlide) {
       return;
     }
     const timer = window.setInterval(() => {
-      setActiveIndex((index) => (index + 1) % watchFeed.length);
+      setActiveIndex((index) => (index + 1) % carouselItems.length);
     }, AUTO_ROTATE_MS);
     return () => window.clearInterval(timer);
-  }, [watch]);
+  }, [watch, isAdSlide, carouselItems.length]);
+
+  // Item 1.2 — ao zerar o contador da publicidade, volta ao conteúdo.
+  useEffect(() => {
+    if (isAdSlide && adRemaining <= 0) {
+      setActiveIndex((index) => ((index + 1) % carouselItems.length));
+    }
+  }, [isAdSlide, adRemaining, carouselItems.length]);
+
+  const skipAd = useCallback(() => {
+    setActiveIndex((index) => ((index + 1) % carouselItems.length));
+  }, [carouselItems.length]);
+
+  // Item 2.2 — alvo do CTA: grade de programação ou player/live.
+  const scrollToSchedule = useCallback(() => {
+    document
+      .getElementById("grade-programacao")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+  const openLive = useCallback(() => {
+    const liveItem = watchFeed.find((item) => item.kind === "live");
+    if (liveItem) {
+      onPlay(liveItem);
+    }
+  }, [onPlay]);
+  const handleAdTarget = useCallback(() => {
+    if (!activeAd) {
+      return;
+    }
+    if (activeAd.target === "schedule") {
+      scrollToSchedule();
+      return;
+    }
+    if (activeAd.target === "live") {
+      openLive();
+      return;
+    }
+    if (activeAd.targetUrl) {
+      window.location.hash = activeAd.targetUrl;
+    }
+  }, [activeAd, openLive, scrollToSchedule]);
 
   // Cores ambiente capturadas da capa/vídeo em exibição (só enquanto toca).
   const watchImage = watch?.phase === "playing" ? watch.item.image : null;
@@ -486,106 +558,172 @@ function RadioHero({
     >
       {!watch && (
         <>
-          {/* A capa do destaque cobre o banner inteiro. Quando a manchete tem
-              matéria vinculada, a capa abre o artigo para leitura; sem matéria,
-              o clique na capa reproduz. O play central aparece só no hover. */}
-          <div className="group absolute inset-0 block h-full w-full">
-            {articleLink ? (
-              <Link
-                to={articleLink}
-                aria-label={`Abrir matéria: ${active.title}`}
-                className="absolute inset-0 block h-full w-full"
-              >
-                <img
-                  src={active.image}
-                  alt=""
-                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-                />
-                <div className="absolute inset-0 bg-hero-overlay" />
-              </Link>
-            ) : (
+          {/* Capa do slide: manchete (watchFeed) ou publicidade (featured
+              anúncio "empurrado" para a posição de hero — item 1.2). */}
+          {isAdSlide && activeAd ? (
+            <div className="group absolute inset-0 block h-full w-full">
               <button
                 type="button"
-                onClick={() => onPlay(active)}
-                aria-label={`Reproduzir ${active.title}`}
+                onClick={handleAdTarget}
+                aria-label={`Abrir publicidade: ${activeAd.headline}`}
                 className="absolute inset-0 block h-full w-full"
               >
                 <img
-                  src={active.image}
+                  src={activeAd.image}
                   alt=""
                   className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
                 />
                 <div className="absolute inset-0 bg-hero-overlay" />
               </button>
-            )}
+              {/* Tarja "Patrocinado" + contador do slide (item 1.2) */}
+              <span className="pointer-events-none absolute left-4 top-4 z-20 flex items-center gap-2">
+                <span
+                  data-testid="hero-sponsored-badge"
+                  className="rounded-sm bg-brand/95 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-brand-foreground shadow-lg"
+                >
+                  {activeAd.tagline}
+                </span>
+                <span
+                  data-testid="hero-ad-countdown"
+                  className="rounded-sm bg-black/60 px-2 py-1.5 text-xs font-bold tabular-nums text-white"
+                >
+                  {Math.ceil(adRemaining / 1000)}s
+                </span>
+              </span>
+            </div>
+          ) : (
+            <div className="group absolute inset-0 block h-full w-full">
+              {articleLink ? (
+                <Link
+                  to={articleLink}
+                  aria-label={`Abrir matéria: ${activeMedia.title}`}
+                  className="absolute inset-0 block h-full w-full"
+                >
+                  <img
+                    src={activeMedia.image}
+                    alt=""
+                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                  />
+                  <div className="absolute inset-0 bg-hero-overlay" />
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onPlay(activeMedia)}
+                  aria-label={`Reproduzir ${activeMedia.title}`}
+                  className="absolute inset-0 block h-full w-full"
+                >
+                  <img
+                    src={activeMedia.image}
+                    alt=""
+                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                  />
+                  <div className="absolute inset-0 bg-hero-overlay" />
+                </button>
+              )}
 
-            {/* Botão do player no centro da capa — visível apenas ao passar o
-                dedo/mouse sobre a capa ou ao focar (estilo YouTube) */}
-            <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100">
-              <button
-                type="button"
-                onClick={() => onPlay(active)}
-                aria-label={`Reproduzir ${active.title}`}
-                className="pointer-events-auto flex h-20 w-20 items-center justify-center rounded-full bg-brand/95 text-brand-foreground shadow-2xl ring-4 ring-white/25 transition-transform duration-200 group-hover:scale-110 md:h-24 md:w-24"
-              >
-                <Play className="h-9 w-9 translate-x-0.5 fill-current md:h-10 md:w-10" />
-              </button>
-            </span>
-          </div>
+              {/* Botão do player no centro da capa — visível apenas ao passar o
+                  dedo/mouse sobre a capa ou ao focar (estilo YouTube) */}
+              <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100">
+                <button
+                  type="button"
+                  onClick={() => onPlay(activeMedia)}
+                  aria-label={`Reproduzir ${activeMedia.title}`}
+                  className="pointer-events-auto flex h-20 w-20 items-center justify-center rounded-full bg-brand/95 text-brand-foreground shadow-2xl ring-4 ring-white/25 transition-transform duration-200 group-hover:scale-110 md:h-24 md:w-24"
+                >
+                  <Play className="h-9 w-9 translate-x-0.5 fill-current md:h-10 md:w-10" />
+                </button>
+              </span>
+            </div>
+          )}
+
           <div className="container relative flex min-h-[640px] flex-col justify-end py-12 md:min-h-[700px] md:py-16">
             <div className="max-w-2xl">
-              <div className="mb-5 flex flex-wrap items-center gap-3">
-                {/* Badge de nicho/tema — exibido somente quando a manchete tem
-                    matéria vinculada com categoria/tema definido. As tarjas
-                    fixas ("Ao vivo • De Tupã para todo o Brasil") foram
-                    removidas por pedido editorial. */}
-                {active.theme && (
-                  <span
-                    data-testid="hero-theme-badge"
-                    className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md"
-                  >
-                    {active.theme}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-start gap-4 sm:gap-5">
-                <div className="min-w-0">
+              {isAdSlide && activeAd ? (
+                <>
+                  <div className="mb-5 flex flex-wrap items-center gap-3">
+                    <span className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md">
+                      {activeAd.tagline}
+                    </span>
+                  </div>
                   <h1 className="font-serif text-3xl font-bold leading-tight text-overlay-foreground md:text-5xl">
-                    {articleLink ? (
-                      <Link to={articleLink} className="transition-colors hover:text-brand">
-                        {active.title}
-                      </Link>
-                    ) : (
-                      active.title
-                    )}
+                    {activeAd.headline}
                   </h1>
                   <p className="mt-3 max-w-2xl text-base leading-relaxed text-overlay-muted md:text-lg">
-                    {watchBlurb(active)}
+                    {activeAd.caption}
                   </p>
                   <div className="mt-6 flex flex-wrap items-center gap-3">
-                    <Button asChild variant="outline" size="lg">
-                      <Link to={articleLink ?? "/noticias"}>
-                        <Newspaper className="h-5 w-5" /> Acessar Vitória News
-                      </Link>
+                    <Button type="button" onClick={handleAdTarget} size="lg">
+                      {activeAd.ctaLabel}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={skipAd} size="lg">
+                      Pular anúncio
                     </Button>
                   </div>
-                </div>
-              </div>
+                </>
+              ) : (
+                <>
+                  <div className="mb-5 flex flex-wrap items-center gap-3">
+                    {/* Badge de nicho/tema — exibido somente quando a manchete tem
+                        matéria vinculada com categoria/tema definido. As tarjas
+                        fixas ("Ao vivo • De Tupã para todo o Brasil") foram
+                        removidas por pedido editorial. */}
+                    {activeMedia.theme && (
+                      <span
+                        data-testid="hero-theme-badge"
+                        className="rounded-sm border border-overlay-foreground/20 bg-background/30 px-3 py-1.5 text-[10px] font-bold uppercase text-overlay-foreground backdrop-blur-md"
+                      >
+                        {activeMedia.theme}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-start gap-4 sm:gap-5">
+                    <div className="min-w-0">
+                      <h1 className="font-serif text-3xl font-bold leading-tight text-overlay-foreground md:text-5xl">
+                        {articleLink ? (
+                          <Link to={articleLink} className="transition-colors hover:text-brand">
+                            {activeMedia.title}
+                          </Link>
+                        ) : (
+                          activeMedia.title
+                        )}
+                      </h1>
+                      <p className="mt-3 max-w-2xl text-base leading-relaxed text-overlay-muted md:text-lg">
+                        {watchBlurb(activeMedia)}
+                      </p>
+                      <div className="mt-6 flex flex-wrap items-center gap-3">
+                        <Button asChild variant="outline" size="lg">
+                          <Link to={articleLink ?? "/noticias"}>
+                            <Newspaper className="h-5 w-5" /> Acessar Vitória News
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
             <div className="mt-6 flex justify-end gap-1.5 lg:hidden" aria-label="Selecionar manchete em destaque">
-              {watchFeed.map((item, index) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setActiveIndex(index)}
-                  aria-label={`Ir para manchete: ${item.title}`}
-                  aria-current={index === activeIndex}
-                  className={cn(
-                    "h-1.5 w-6 rounded-full transition-colors",
-                    index === activeIndex ? "bg-brand" : "bg-foreground/20 hover:bg-foreground/40",
-                  )}
-                />
-              ))}
+              {carouselItems.map((item, index) => {
+                const isAdDot = "featured" in item && item.featured === true;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveIndex(index)}
+                    aria-label={
+                      isAdDot
+                        ? `Ir para publicidade: ${item.headline}`
+                        : `Ir para manchete: ${item.title}`
+                    }
+                    aria-current={index === activeIndex}
+                    className={cn(
+                      "h-1.5 w-6 rounded-full transition-colors",
+                      index === activeIndex ? "bg-brand" : "bg-foreground/20 hover:bg-foreground/40",
+                    )}
+                  />
+                );
+              })}
             </div>
           </div>
         </>
@@ -695,7 +833,7 @@ function ProgrammingSection({
   };
 
   return (
-    <section className="page-band">
+    <section id="grade-programacao" className="page-band scroll-mt-20">
       <div className="container grid gap-10 lg:grid-cols-[17rem_1fr]">
         {/* Menu lateral da programação — esquerda, como no layout original */}
         <aside className="space-y-5">

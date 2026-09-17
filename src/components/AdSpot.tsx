@@ -14,6 +14,15 @@ export interface AdCampaign {
   image: string;
   ctaLabel: string;
   skipAfterMs: number;
+  /** Item 1.2: quando true, a campanha entra no carrossel do banner gigante. */
+  featured?: boolean;
+  /** Item 2.2: alvo do clique — "url" externa, "schedule" (grade) ou "live". */
+  target?: "url" | "schedule" | "live";
+  /** URL usada quando `target === "url"`. */
+  targetUrl?: string;
+  /** Item 2.1: proximo item agendado/estreia representado pelo anuncio. */
+  scheduledTitle?: string;
+  scheduledWhen?: string;
 }
 
 interface AdSpotProps {

@@ -1008,6 +1008,54 @@ describe("Home — player imersivo no banner gigante", () => {
     ).toHaveAttribute("href", "/artigo/2");
   });
 
+  it("1.2 — anúncio feature entra no carrossel com tarja Patrocinado, contador e Pular anúncio", () => {
+    renderWithProviders(<Home />);
+
+    // O anúncio em destaque (featured) é um slide do carrossel do banner.
+    const adPoints = screen.getAllByRole("button", { name: /Ir para publicidade:/i });
+    expect(adPoints.length).toBeGreaterThan(0);
+
+    fireEvent.click(adPoints[0]);
+
+    // Tarja "Patrocinado", contador e botão "Pular anúncio" no slide.
+    expect(screen.getByTestId("hero-sponsored-badge")).toHaveTextContent(/patrocinado|publicidade/i);
+    expect(screen.getByTestId("hero-ad-countdown")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Pular anúncio/i })).toBeInTheDocument();
+  });
+
+  it("1.2 — o play automático é pausado no slide de publicidade", () => {
+    vi.useFakeTimers();
+    renderWithProviders(<Home />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Ir para publicidade:/i })[0]);
+
+    // Passa um ciclo completo de rotação (AUTO_ROTATE_MS = 8000): o carrossel
+    // permanece na publicidade (não avança sozinho para a próxima manchete).
+    act(() => {
+      vi.advanceTimersByTime(8000);
+    });
+    expect(screen.getByTestId("hero-sponsored-badge")).toBeInTheDocument();
+
+    // Ao zerar o contador da publicidade, o carrossel volta ao conteúdo.
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(screen.queryByTestId("hero-sponsored-badge")).not.toBeInTheDocument();
+  });
+
+  it("1.2 — clicar no CTA da publicidade abre a grade de programação", async () => {
+    const scrollIntoView = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    renderWithProviders(<Home />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Ir para publicidade:/i })[0]);
+    fireEvent.click(screen.getByRole("button", { name: /Ver na grade/i }));
+
+    expect(scrollIntoView).toHaveBeenCalledWith(
+      expect.objectContaining({ behavior: "smooth", block: "start" }),
+    );
+  });
+
   it("manchete sem matéria vinculada mantém a capa clicável para reproduzir", () => {
     mockMedia();
     renderWithProviders(<Home />);
