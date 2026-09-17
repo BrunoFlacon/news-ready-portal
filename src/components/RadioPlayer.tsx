@@ -55,12 +55,8 @@ import {
   ShareContentDialog,
 } from "@/components/SocialDialogs";
 import { podcasts, type Podcast } from "@/data/podcasts";
-import {
-  breakingVisuals,
-  schedule,
-  upcomingLive,
-  type VisualFeedItem,
-} from "@/data/media";
+import { breakingVisuals, type VisualFeedItem } from "@/data/media";
+import { upcomingLiveFrom, useSchedule } from "@/lib/schedule";
 
 /**
  * URL do stream da rádio ao vivo.
@@ -826,6 +822,8 @@ export function RadioPlayerBar({
   const [shareOpen, setShareOpen] = useState(false);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
+  // Fase C (3.2) — o programa exibido vem da grade editável do painel admin.
+  const grade = useSchedule();
 
   // Aplica o volume do player ao elemento <audio> da transmissão.
   useEffect(() => {
@@ -841,7 +839,7 @@ export function RadioPlayerBar({
     return null;
   }
 
-  const program = upcomingLive ?? schedule[0];
+  const program = upcomingLiveFrom(grade) ?? grade[0];
 
   const openInNewTab = (href: string) => {
     window.open(href, "_blank");
@@ -1009,7 +1007,7 @@ export function RadioPlayerBar({
           {chatOpen && (
             <InlineComments
               publicationId="radio-live"
-              title={upcomingLive?.title ?? "Rádio ao vivo"}
+              title={upcomingLiveFrom(grade)?.title ?? "Rádio ao vivo"}
               live
               onClose={() => setChatOpen(false)}
               className="absolute bottom-full right-0 z-[70] mb-2 w-80 max-w-[78vw] rounded-lg shadow-2xl"
@@ -1116,11 +1114,14 @@ export function LiveMiniCard({
   closePlayer,
   audioRef,
 }: LiveMiniCardProps) {
+  // Fase C (3.2) — a grade editável alimenta o programa exibido no card.
+  const grade = useSchedule();
+
   if (!url) {
     return null;
   }
 
-  const program = upcomingLive ?? schedule[0];
+  const program = upcomingLiveFrom(grade) ?? grade[0];
 
   return (
     <div

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +13,9 @@ import ArticlePage from "./pages/ArticlePage";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import Contact from "./pages/Contact";
+import Admin from "./pages/Admin";
+import AdminAds from "./pages/AdminAds";
+import AdminSchedule from "./pages/AdminSchedule";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,6 +59,12 @@ export function AppRoutes() {
         <Route path="/noticias" element={<Index />} />
         <Route path="/artigo/:id" element={<ArticlePage />} />
         <Route path="/contato" element={<Contact />} />
+        {/* Painel administrativo (Onda 6, fase C): anúncios e grade de programação */}
+        <Route path="/admin" element={<Admin />}>
+          <Route index element={<Navigate to="/admin/ads" replace />} />
+          <Route path="ads" element={<AdminAds />} />
+          <Route path="schedule" element={<AdminSchedule />} />
+        </Route>
         {/* Páginas legais para aprovação de APIs */}
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-of-service" element={<TermsOfService />} />

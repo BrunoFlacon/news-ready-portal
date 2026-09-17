@@ -24,17 +24,22 @@ import { Button } from "@/components/ui/button";
 import { InlineComments, SocialBar, SocialRail } from "@/components/SocialDialogs";
 import { trackView, useSocialItem } from "@/lib/social";
 import { addWeekAlert } from "@/lib/alerts";
+import {
+  featuredAdCampaigns,
+  pickAdCampaign,
+  recordAdClick,
+  recordAdImpression,
+  useAdCampaigns,
+} from "@/lib/ads";
+import { upcomingLiveFrom, useSchedule } from "@/lib/schedule";
 import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
 import { extractPalette, type AmbientPalette } from "@/lib/ambient";
 import { podcasts } from "@/data/podcasts";
-import { featuredAdCampaigns, pickAdCampaign } from "@/data/ads";
 import {
   institutionalServices,
   nextUpcoming,
-  schedule,
   socialMedia,
   stories,
-  upcomingLive,
   watchFeed,
   watchRecommendations,
   type ScheduleEntry,
@@ -118,10 +123,23 @@ function WatchOverlay({
   const next = phase === "transition" ? watch.next : null;
   const vertical = item.orientation === "vertical";
 
+  // Fase C (3.2) — a grade é editável no painel admin e chega reativa aqui:
+  // a grade lateral, o card "A seguir" e a tarja refletem o que o editor salvar.
+  const grade = useSchedule();
+  const nextLive = upcomingLiveFrom(grade);
+
   // Item 2.1 — card "A seguir" na transição: o próximo agendado/estreia da
   // grade (não-premium), com título, descrição e horário + "Lembrar-me".
-  const upcoming = transitioning ? nextUpcoming(item) : null;
+  const upcoming = transitioning ? nextUpcoming(item, grade) : null;
   const [remindedId, setRemindedId] = useState<string | null>(null);
+
+  // Fase C (3.1) — métrica de impressão: cada exibição do intersticial conta.
+  const adId = ad?.id ?? null;
+  useEffect(() => {
+    if (adId) {
+      recordAdImpression(adId);
+    }
+  }, [adId]);
   useEffect(() => {
     setRemindedId(null);
   }, [item.id]);
@@ -397,13 +415,13 @@ function WatchOverlay({
                 <div className="rounded-lg border border-border bg-card p-5">
                   <p className="editorial-kicker">Grade de programação</p>
                   <h3 className="mt-2 font-serif text-lg font-bold text-foreground">Próxima live</h3>
-                  {upcomingLive && (
+                  {nextLive && (
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {upcomingLive.title} — {upcomingLive.day} às {upcomingLive.time} com {upcomingLive.host}
+                      {nextLive.title} — {nextLive.day} às {nextLive.time} com {nextLive.host}
                     </p>
                   )}
                   <p className="mt-3 text-xs text-muted-foreground">
-                    Próximo programa: {firstFreeProgram().title} com {firstFreeProgram().host}
+                    Próximo programa: {firstFreeProgram(grade).title} com {firstFreeProgram(grade).host}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border bg-card p-5">
@@ -427,8 +445,9 @@ function WatchOverlay({
   );
 }
 
-function firstFreeProgram(): ScheduleEntry {
-  return schedule.find((entry) => entry.kind === "program" && !entry.premium) ?? schedule[0];
+/** Primeiro programa gratuito da grade informada (ou o primeiro item dela). */
+function firstFreeProgram(entries: ScheduleEntry[]): ScheduleEntry {
+  return entries.find((entry) => entry.kind === "program" && !entry.premium) ?? entries[0];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -471,11 +490,15 @@ function RadioHero({
     });
   }, []);
 
+  // Fase C (3.1) — campanhas do painel admin (reativas): criar, pausar ou
+  // reativar muda o carrossel e o intersticial na hora, sem recarregar.
+  const ads = useAdCampaigns();
+
   // Item 1.2 — o carrossel une as manchetes (`watchFeed`) e os anúncios
   // `featured` (slides patrocinados "empurrados" para a posição de hero).
   const carouselItems = useMemo(
-    () => [...watchFeed, ...featuredAdCampaigns()] as Array<WatchFeedItem | AdCampaign>,
-    [],
+    () => [...watchFeed, ...featuredAdCampaigns(ads)] as Array<WatchFeedItem | AdCampaign>,
+    [ads],
   );
   const active = carouselItems[activeIndex % carouselItems.length];
   const isAdSlide = active !== undefined && "featured" in active && active.featured === true;
@@ -483,6 +506,13 @@ function RadioHero({
   const firstAdIndex = carouselItems.findIndex(
     (item) => "featured" in item && item.featured === true,
   );
+
+  // Fase C (3.1) — métrica de impressão do slide patrocinado do banner.
+  useEffect(() => {
+    if (activeAd) {
+      recordAdImpression(activeAd.id);
+    }
+  }, [activeAd]);
 
   // Quando a manchete tem matéria vinculada, a capa abre o artigo para leitura.
   const activeMedia = isAdSlide ? watchFeed[0] : (active as WatchFeedItem);
@@ -541,6 +571,8 @@ function RadioHero({
   /** Alvo genérico de campanha (hero, intersticial e card "A seguir"). */
   const resolveAdTarget = useCallback(
     (ad: AdCampaign) => {
+      // Fase C (3.1) — métrica de clique no CTA da campanha.
+      recordAdClick(ad.id);
       if (ad.target === "schedule") {
         scrollToSchedule();
         return;
@@ -867,6 +899,8 @@ function ProgrammingSection({
   onPremium: (target: PremiumTarget) => void;
 }) {
   const player = useRadioPlayerContext();
+  // Fase C (3.2) — a grade exibida é a editada no painel admin (reativa).
+  const grade = useSchedule();
 
   const handleRow = (entry: ScheduleEntry) => {
     if (entry.premium) {
@@ -910,7 +944,7 @@ function ProgrammingSection({
             </p>
           </div>
           <div className="space-y-3" data-testid="schedule-grid">
-            {schedule.map((entry, index) => (
+            {grade.map((entry, index) => (
               <button
                 key={entry.id}
                 type="button"
@@ -1112,6 +1146,8 @@ function PremiumPanel({ target, onClose }: { target: PremiumTarget; onClose: () 
 export default function Home() {
   const [watch, setWatch] = useState<WatchState | null>(null);
   const [premium, setPremium] = useState<PremiumTarget | null>(null);
+  // Fase C (3.1) — campanhas do painel admin alimentam o intersticial.
+  const ads = useAdCampaigns();
 
   // Referência ao banner gigante: ao escolher um reel/story na faixa de
   // entretenimento, a página rola suavemente até aqui antes de abrir o player.
@@ -1146,9 +1182,15 @@ export default function Home() {
       // Onda 6 (item 1.1): entre o fim deste e o próximo, o anúncio
       // intersticial entra em cena (fase "ad"); ao pular/terminar, a casa
       // segue para a transição existente — o próximo nunca é bloqueado.
-      return { item: prev.item, phase: "ad", next, ad: pickAdCampaign(index < 0 ? 0 : index) };
+      // Fase C (3.1): só campanhas ativas entram; sem nenhuma (todas
+      // pausadas/removidas no painel), vai direto para a transição.
+      const ad = pickAdCampaign(index < 0 ? 0 : index, ads);
+      if (!ad) {
+        return { item: prev.item, phase: "transition", next };
+      }
+      return { item: prev.item, phase: "ad", next, ad };
     });
-  }, []);
+  }, [ads]);
 
   const handleAdDone = useCallback(() => {
     setWatch((prev) => {

@@ -59,12 +59,3 @@ export const adCampaigns: AdCampaign[] = [
   },
 ];
 
-/** Campanhas com `featured` — slides patrocinados do carrossel do banner. */
-export function featuredAdCampaigns(): AdCampaign[] {
-  return adCampaigns.filter((ad) => ad.featured);
-}
-
-/** Campanha ativa para o intersticial (rotação simples por número de exibição). */
-export function pickAdCampaign(exhibitionIndex: number): AdCampaign {
-  return adCampaigns[exhibitionIndex % adCampaigns.length];
-}

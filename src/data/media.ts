@@ -169,9 +169,12 @@ export const upcomingLive = schedule.find((entry) => entry.kind === "live" && !e
  * editorial do seed. Ignora reapresentacoes premium (que sao convite para
  * assinar, nao "a seguir").
  */
-export function nextUpcoming(item?: WatchFeedItem | null): ScheduleEntry | null {
+export function nextUpcoming(
+  item?: WatchFeedItem | null,
+  entries: ScheduleEntry[] = schedule,
+): ScheduleEntry | null {
   const now = Date.now();
-  const candidates = schedule.filter(
+  const candidates = entries.filter(
     (entry) =>
       !entry.premium &&
       entry.kind !== "replay" &&

@@ -23,6 +23,12 @@ export interface AdCampaign {
   /** Item 2.1: proximo item agendado/estreia representado pelo anuncio. */
   scheduledTitle?: string;
   scheduledWhen?: string;
+  /** Fase C (3.1): estado no painel admin — "paused" sai da rotacao. */
+  status?: "active" | "paused";
+  /** Fase C (3.1): formato do criativo (16:9 horizontal / 9:16 vertical). */
+  orientation?: "horizontal" | "vertical";
+  /** Fase C (3.1): onde o anuncio pode aparecer. */
+  kind?: "interstitial" | "banner" | "next";
 }
 
 interface AdSpotProps {
