@@ -23,12 +23,14 @@ import { AdSpot, DEFAULT_SKIP_AFTER_MS, type AdCampaign } from "@/components/AdS
 import { Button } from "@/components/ui/button";
 import { InlineComments, SocialBar, SocialRail } from "@/components/SocialDialogs";
 import { trackView, useSocialItem } from "@/lib/social";
+import { addWeekAlert } from "@/lib/alerts";
 import { useRadioPlayerContext } from "@/contexts/RadioPlayerContext";
 import { extractPalette, type AmbientPalette } from "@/lib/ambient";
 import { podcasts } from "@/data/podcasts";
 import { featuredAdCampaigns, pickAdCampaign } from "@/data/ads";
 import {
   institutionalServices,
+  nextUpcoming,
   schedule,
   socialMedia,
   stories,
@@ -87,6 +89,10 @@ interface WatchOverlayProps {
   onEnded: () => void;
   onAdDone: () => void;
   onPremiumRequest: (target: PremiumTarget) => void;
+  /** Item 2.2 — alvo do CTA de anúncios: grade, live ou URL externa. */
+  onAdTarget: (ad: AdCampaign) => void;
+  /** Item 2.1 — rolar até a grade de programação ("Ver na grade"). */
+  onSchedule: () => void;
 }
 
 function WatchOverlay({
@@ -102,6 +108,8 @@ function WatchOverlay({
   onEnded,
   onAdDone,
   onPremiumRequest,
+  onAdTarget,
+  onSchedule,
 }: WatchOverlayProps) {
   const { item, phase } = watch;
   const transitioning = phase === "transition";
@@ -109,6 +117,25 @@ function WatchOverlay({
   const ad = phase === "ad" ? watch.ad : null;
   const next = phase === "transition" ? watch.next : null;
   const vertical = item.orientation === "vertical";
+
+  // Item 2.1 — card "A seguir" na transição: o próximo agendado/estreia da
+  // grade (não-premium), com título, descrição e horário + "Lembrar-me".
+  const upcoming = transitioning ? nextUpcoming(item) : null;
+  const [remindedId, setRemindedId] = useState<string | null>(null);
+  useEffect(() => {
+    setRemindedId(null);
+  }, [item.id]);
+  const handleRemindMe = useCallback(() => {
+    if (!upcoming) {
+      return;
+    }
+    addWeekAlert({
+      title: upcoming.title,
+      when: `${upcoming.day} • ${upcoming.time}`,
+      startsAt: upcoming.startsAt,
+    });
+    setRemindedId(upcoming.id);
+  }, [upcoming]);
 
   // Barra horizontal some depois que o visitante curte ou comenta o conteúdo;
   // reaparece quando o mouse volta sobre o vídeo (item 3.2). O rail vertical
@@ -167,7 +194,12 @@ function WatchOverlay({
           <div className="absolute inset-0 z-10 flex h-full w-full items-center justify-center">
             <div className={cn("relative h-full", vertical ? "w-fit max-w-full" : "w-full")}>
               {inAd && ad ? (
-                <AdSpot ad={ad} onSkip={onAdDone} onComplete={onAdDone} />
+                <AdSpot
+                  ad={ad}
+                  onSkip={onAdDone}
+                  onComplete={onAdDone}
+                  onCta={() => onAdTarget(ad)}
+                />
               ) : (
                 <YouTubePlayer
                   src={item.videoUrl}
@@ -317,6 +349,31 @@ function WatchOverlay({
                   <p className="editorial-kicker">{next.kicker}</p>
                   <h3 className="mt-1 font-serif text-lg font-bold text-foreground">{next.headline}</h3>
                   <p className="mt-2 text-xs text-muted-foreground">Reproduzindo automaticamente em instantes…</p>
+                </div>
+              </div>
+            )}
+
+            {/* Item 2.1 — próximo agendado/estreia da grade (não o da fila de
+                reprodução): título, horário, apresentador e os botões
+                "Lembrar-me" (persiste em weekAlerts) e "Ver na grade". */}
+            {adIndex === 0 && upcoming && (
+              <div data-testid="upcoming-card" className="w-full max-w-md rounded-lg border border-border bg-card p-4">
+                <p className="editorial-kicker">Próximo na grade</p>
+                <h3 className="mt-1 font-serif text-base font-bold text-foreground">{upcoming.title}</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {upcoming.host} — {upcoming.day} • {upcoming.time}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant={remindedId === upcoming.id ? "secondary" : "default"}
+                    onClick={handleRemindMe}
+                  >
+                    {remindedId === upcoming.id ? "Lembrete agendado" : "Lembrar-me"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={onSchedule}>
+                    Ver na grade
+                  </Button>
                 </div>
               </div>
             )}
@@ -481,22 +538,28 @@ function RadioHero({
       onPlay(liveItem);
     }
   }, [onPlay]);
+  /** Alvo genérico de campanha (hero, intersticial e card "A seguir"). */
+  const resolveAdTarget = useCallback(
+    (ad: AdCampaign) => {
+      if (ad.target === "schedule") {
+        scrollToSchedule();
+        return;
+      }
+      if (ad.target === "live") {
+        openLive();
+        return;
+      }
+      if (ad.targetUrl) {
+        window.location.hash = ad.targetUrl;
+      }
+    },
+    [openLive, scrollToSchedule],
+  );
   const handleAdTarget = useCallback(() => {
-    if (!activeAd) {
-      return;
+    if (activeAd) {
+      resolveAdTarget(activeAd);
     }
-    if (activeAd.target === "schedule") {
-      scrollToSchedule();
-      return;
-    }
-    if (activeAd.target === "live") {
-      openLive();
-      return;
-    }
-    if (activeAd.targetUrl) {
-      window.location.hash = activeAd.targetUrl;
-    }
-  }, [activeAd, openLive, scrollToSchedule]);
+  }, [activeAd, resolveAdTarget]);
 
   // Cores ambiente capturadas da capa/vídeo em exibição (só enquanto toca).
   const watchImage = watch?.phase === "playing" ? watch.item.image : null;
@@ -743,6 +806,8 @@ function RadioHero({
           onEnded={onEnded}
           onAdDone={onAdDone}
           onPremiumRequest={onPremiumRequest}
+          onAdTarget={resolveAdTarget}
+          onSchedule={scrollToSchedule}
         />
       )}
     </section>

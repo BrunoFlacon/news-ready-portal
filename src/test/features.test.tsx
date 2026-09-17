@@ -1056,6 +1056,66 @@ describe("Home — player imersivo no banner gigante", () => {
     );
   });
 
+  it("2.1 — na transição o card 'A seguir' mostra o próximo agendado/estreia com Lembrar-me e Ver na grade", () => {
+    vi.useFakeTimers();
+    mockMedia();
+    const scrollIntoView = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Assistir Inteligência artificial na saúde/i,
+      }),
+    );
+    const media = screen.getByTestId("watch-media") as HTMLVideoElement;
+    fireEvent(media, new Event("ended"));
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    // Card "A seguir" com o próximo agendado/estreia: título + horário.
+    const upcoming = screen.getByTestId("upcoming-card");
+    expect(within(upcoming).getByText(/Culto de adoração ao vivo/i)).toBeInTheDocument();
+    expect(within(upcoming).getByText(/Domingo • 19h/i)).toBeInTheDocument();
+
+    // "Lembrar-me" persiste em weekAlerts no localStorage.
+    fireEvent.click(within(upcoming).getByRole("button", { name: /Lembrar-me/i }));
+    const saved = JSON.parse(window.localStorage.getItem("radio.weekAlerts") ?? "[]");
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ title: "Culto de adoração ao vivo" });
+
+    // "Ver na grade" rola até a grade de programação.
+    fireEvent.click(within(upcoming).getByRole("button", { name: /Ver na grade/i }));
+    expect(scrollIntoView).toHaveBeenCalledWith(
+      expect.objectContaining({ behavior: "smooth", block: "start" }),
+    );
+  });
+
+  it("2.2 — o CTA do anúncio intersticial com alvo 'schedule' abre a grade de programação", () => {
+    vi.useFakeTimers();
+    mockMedia();
+    const scrollIntoView = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    renderWithProviders(<Home />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Assistir Inteligência artificial na saúde/i,
+      }),
+    );
+    const media = screen.getByTestId("watch-media") as HTMLVideoElement;
+    fireEvent(media, new Event("ended"));
+
+    // O intersticial de "Inteligência artificial na saúde" (índice 2 no
+    // watchRecommendations) exibe a campanha da grade (target "schedule").
+    expect(screen.getByTestId("ad-interstitial")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("ad-cta"));
+    expect(scrollIntoView).toHaveBeenCalledWith(
+      expect.objectContaining({ behavior: "smooth", block: "start" }),
+    );
+  });
+
   it("manchete sem matéria vinculada mantém a capa clicável para reproduzir", () => {
     mockMedia();
     renderWithProviders(<Home />);

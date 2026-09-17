@@ -145,6 +145,9 @@ export interface ScheduleEntry {
   host: string;
   kind: "program" | "live" | "podcast" | "replay";
   premium: boolean;
+  /** Timestamp de inicio (ms) — alimenta o card "A seguir" (2.1) e o motor de
+   *  alertas (4.1). Sem `startsAt`, a ordem do seed define o "proximo". */
+  startsAt?: number;
 }
 
 export const schedule: ScheduleEntry[] = [
@@ -158,6 +161,34 @@ export const schedule: ScheduleEntry[] = [
 
 /** Próxima live agendada (não-premium) — base para a tarja do banner. */
 export const upcomingLive = schedule.find((entry) => entry.kind === "live" && !entry.premium) ?? null;
+
+/**
+ * Item 2.1 — proximo agendado/estreia para o card "A seguir": filtra a grade
+ * por `kind` de conteudo (live/video/podcast/news) com `startsAt > now` (quando
+ * o horario for conhecido) e ordena por horario; sem `startsAt`, mantem a ordem
+ * editorial do seed. Ignora reapresentacoes premium (que sao convite para
+ * assinar, nao "a seguir").
+ */
+export function nextUpcoming(item?: WatchFeedItem | null): ScheduleEntry | null {
+  const now = Date.now();
+  const candidates = schedule.filter(
+    (entry) =>
+      !entry.premium &&
+      entry.kind !== "replay" &&
+      (entry.kind === "live" || entry.kind === "program" || entry.kind === "podcast"),
+  );
+  if (candidates.length === 0) {
+    return null;
+  }
+  const future = candidates
+    .filter((entry) => entry.startsAt === undefined || entry.startsAt > now)
+    .sort((a, b) => (a.startsAt ?? 0) - (b.startsAt ?? 0));
+  const pool = future.length > 0 ? future : candidates;
+  const withoutCurrent = item
+    ? pool.find((entry) => entry.id !== item.id) ?? pool[0]
+    : pool[0];
+  return withoutCurrent;
+}
 
 /**
  * Item assistível no banner gigante: vídeos horizontais, lives, reels e
