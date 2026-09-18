@@ -48,6 +48,9 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SITE_URL, whatsAppLink } from "@/lib/whatsapp";
 import { useSocialItem } from "@/lib/social";
+import { useAlerts, toggleAlertMuted } from "@/lib/alerts";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { playAlertSound } from "@/lib/audio-alert";
 import {
   CommentDialog,
   InlineComments,
@@ -698,7 +701,7 @@ export function LiveEqualizer({
       setRealTime(false);
       raf = requestAnimationFrame(syntheticTick);
 
-      const audio = audioRef.current;
+      const audio = audioRef?.current;
       // Firefox: captureStream em <audio> silencia a saída do elemento
       // (bug 1581192) — nesse navegador ficamos no modo sintético para
       // garantir que a rádio continue tocando.
@@ -827,7 +830,7 @@ export function RadioPlayerBar({
 
   // Aplica o volume do player ao elemento <audio> da transmissão.
   useEffect(() => {
-    const audio = audioRef.current;
+    const audio = audioRef?.current;
     if (!audio) {
       return;
     }
@@ -1933,6 +1936,72 @@ export function VideoBubble({
           className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground"
         >
           <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Player de rádio principal (mobile-first).
+ * Em mobile, exibe a tarja de breaking na borda inferior da barra do player
+ * e o botão de mute global (testids: player-breaking-bar, player-alert-mute).
+ */
+export function RadioPlayer() {
+  const { breaking, mutedAlert } = useAlerts();
+  const lastPlayed = useRef<string | null>(null);
+
+  // Som UMA vez por alerta breaking novo: guard por id do breaking.
+  useEffect(() => {
+    if (!breaking) {
+      return;
+    }
+    const key = `b:${breaking.id}`;
+    if (key === lastPlayed.current) {
+      return;
+    }
+    lastPlayed.current = key;
+    playAlertSound({
+      kind: "breaking",
+      volume: 1,
+      muted: mutedAlert,
+    });
+  }, [breaking, mutedAlert]);
+
+  if (!breaking) {
+    return null;
+  }
+
+  return (
+    <div
+      data-testid="player-breaking-bar"
+      className="fixed inset-x-0 bottom-0 z-[70] mx-auto max-w-full border-t border-red-500/60 bg-red-600 px-3 py-2 shadow-2xl"
+      role="alert"
+      aria-live="assertive"
+    >
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2">
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+          </span>
+          <span className="whitespace-nowrap text-xs font-black uppercase tracking-wide">
+            Urgente — {breaking.title}
+          </span>
+        </div>
+        <button
+          type="button"
+          data-testid="player-alert-mute"
+          onClick={toggleAlertMuted}
+          aria-label={mutedAlert ? "Ativar som" : "Silenciar"}
+          aria-pressed={mutedAlert}
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+        >
+          {mutedAlert ? (
+            <VolumeX className="h-4 w-4" />
+          ) : (
+            <Volume2 className="h-4 w-4" />
+          )}
         </button>
       </div>
     </div>

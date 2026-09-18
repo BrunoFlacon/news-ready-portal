@@ -1,0 +1,64 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/wamp64/www/news-ready-portal/opencode/news-ready-portal[39m
+
+[1m[43m DEPRECATED [49m[22m [33m'basic' reporter is deprecated and will be removed in Vitest v3.
+Remove 'basic' from 'reporters' option. To match 'basic' reporter 100%, use configuration:
+{
+  "test": {
+    "reporters": [
+      [
+        "default",
+        {
+          "summary": false
+        }
+      ]
+    ]
+  }
+}[39m
+
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/test/alerts.test.tsx[2m [ src/test/alerts.test.tsx ][22m
+[31m[1mError[22m:   x Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+      ,-[C:/wamp64/www/news-ready-portal/opencode/news-ready-portal/src/pages/Home.tsx:1255:1]
+ 1252 |       {premium && <PremiumPanel target={premium} onClose={() => setPremium(null)} />}
+ 1253 |     </Layout>
+ 1254 |   );
+ 1255 | }
+      : ^
+ 1256 | 
+ 1257 | /* Export named (Fase D) para testes que importam { Home }. */
+      `----
+  x Expected '</', got 'jsx text (
+  |   );
+  | }
+  |
+  | /* Export named (Fase D) para testes que importam )'
+      ,-[C:/wamp64/www/news-ready-portal/opencode/news-ready-portal/src/pages/Home.tsx:1253:1]
+ 1250 |           <EntertainmentBand onSelectId={selectWatchById} />
+ 1251 |           <InstitutionalBand />
+ 1252 |           {premium && <PremiumPanel target={premium} onClose={() => setPremium(null)} />}
+ 1253 | ,->     </Layout>
+ 1254 | |     );
+ 1255 | |   }
+ 1256 | |   
+ 1257 | `-> /* Export named (Fase D) para testes que importam { Home }. */
+ 1258 |     
+ 1259 |     /**
+ 1260 |      * Fase D (4.1/4.2) - central de alertas da Home: sino com badge de nao lidos,
+      `----
+
+
+Caused by:
+    Syntax Error[39m
+  Plugin: [35mvite:react-swc[39m
+  File: [36mC:/wamp64/www/news-ready-portal/opencode/news-ready-portal/src/pages/Home.tsx[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [2mno tests[22m
+[2m   Start at [22m 23:14:03
+[2m   Duration [22m 3.45s[2m (transform 407ms, setup 231ms, collect 0ms, tests 0ms, environment 1.19s, prepare 215ms)[22m
+

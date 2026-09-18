@@ -1,0 +1,1 @@
+npx vitest run src/test/alerts.test.tsx --reporter=basic --no-coverage

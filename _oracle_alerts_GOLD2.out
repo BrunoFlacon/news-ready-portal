@@ -1,0 +1,69 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/wamp64/www/news-ready-portal/opencode/news-ready-portal[39m
+
+[1m[43m DEPRECATED [49m[22m [33m'basic' reporter is deprecated and will be removed in Vitest v3.
+Remove 'basic' from 'reporters' option. To match 'basic' reporter 100%, use configuration:
+{
+  "test": {
+    "reporters": [
+      [
+        "default",
+        {
+          "summary": false
+        }
+      ]
+    ]
+  }
+}[39m
+
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/test/alerts.test.tsx[2m [ src/test/alerts.test.tsx ][22m
+[31m[1mError[22m:   x Expression expected
+      ,-[C:/wamp64/www/news-ready-portal/opencode/news-ready-portal/src/pages/Home.tsx:1246:1]
+ 1243 |         onAutoPlay={autoPlayNext}
+ 1244 |         onPremiumRequest={openPremium}
+ 1245 |         bannerRef={bannerRef}
+ 1246 |       <HomeAlertCenter />
+      :       ^
+ 1247 |       <VisualCardsRail />
+ 1248 |     <ProgrammingSection onPlay={playNow} onPremium={openPremium} />
+ 1249 |       <EntertainmentBand onSelectId={selectWatchById} />
+      `----
+  x Expression expected
+      ,-[C:/wamp64/www/news-ready-portal/opencode/news-ready-portal/src/pages/Home.tsx:1246:1]
+ 1243 |         onAutoPlay={autoPlayNext}
+ 1244 |         onPremiumRequest={openPremium}
+ 1245 |         bannerRef={bannerRef}
+ 1246 |       <HomeAlertCenter />
+      :                         ^
+ 1247 |       <VisualCardsRail />
+ 1248 |     <ProgrammingSection onPlay={playNow} onPremium={openPremium} />
+ 1249 |       <EntertainmentBand onSelectId={selectWatchById} />
+      `----
+  x Expected ';', got 'onPlay'
+      ,-[C:/wamp64/www/news-ready-portal/opencode/news-ready-portal/src/pages/Home.tsx:1248:1]
+ 1245 |         bannerRef={bannerRef}
+ 1246 |       <HomeAlertCenter />
+ 1247 |       <VisualCardsRail />
+ 1248 |     <ProgrammingSection onPlay={playNow} onPremium={openPremium} />
+      :                         ^^^^^^
+ 1249 |       <EntertainmentBand onSelectId={selectWatchById} />
+ 1250 |       <InstitutionalBand />
+ 1251 |       {premium && <PremiumPanel target={premium} onClose={() => setPremium(null)} />}
+      `----
+
+
+Caused by:
+    Syntax Error[39m
+  Plugin: [35mvite:react-swc[39m
+  File: [36mC:/wamp64/www/news-ready-portal/opencode/news-ready-portal/src/pages/Home.tsx[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [2mno tests[22m
+[2m   Start at [22m 21:39:34
+[2m   Duration [22m 2.93s[2m (transform 353ms, setup 193ms, collect 0ms, tests 0ms, environment 1.01s, prepare 184ms)[22m
+

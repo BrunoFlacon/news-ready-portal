@@ -1,116 +1,131 @@
-# Web Rádio Vitória — Portal de Notícias (news-ready-portal)
+# Web Rádio Vitória — Portal de Notícias
 
-Repositório **único** do projeto Web Rádio Vitória (Tupã–SP · “24 hs Adorando a Deus”).
-
-Resultado da **unificação** de dois repositórios:
-- `BrunoFlacon/news-ready-portal` — portal de notícias + páginas legais (para aprovação de APIs TikTok/Meta/Google).
-- `BrunoFlacon/landpagewebradiovitoria` — landing institucional da rádio (design “Celestial Signal”).
-
-> 📋 Auditoria e plano de unificação completos: [`AUDITORIA-E-PLANO-UNIFICACAO.md`](./AUDITORIA-E-PLANO-UNIFICACAO.md)
-
----
-
-## Funcionalidades
-
-### Landing institucional (`/`)
-- Hero “AO VIVO” com stats (29K seguidores, 24h, Tupã) e visualizador de ondas animado
-- **Player de áudio ao vivo** — botão “Ouvir Agora” abre barra fixa com stream (URL via `VITE_RADIO_STREAM_URL`); sem URL, exibe estado “Em breve”
-- Seções: Sobre (história + valores), Serviços (6 cards), Depoimentos (4 testemunhos)
-- Contato com informações reais e redes sociais da rádio
-- Footer com slogan “24 hs Adorando a Deus”
-
-### Portal de notícias (`/noticias`, `/artigo/:id`)
-- Listagem com hero de destaque, grade de cards e sidebar (“Em Alta” / “Recentes”)
-- **Filtro por categoria** (Política, Tecnologia, Entretenimento)
-- Página de artigo com autor, data e **compartilhamento real** (Facebook, X, LinkedIn, WhatsApp, copiar link)
-- **Título dinâmico** por artigo (SEO)
-
-### Páginas legais (requisito para aprovação de APIs)
-- Política de Privacidade (`/privacy-policy`)
-- Termos de Serviço (`/terms-of-service`)
-
-### Contato (`/contato`)
-- Formulário completo (nome, e-mail, telefone, mensagem)
-- **Envio real** via `VITE_CONTACT_ENDPOINT` (Formspree/Webhook/WhatsApp API); sem endpoint, modo demonstração
-- **Google Maps** integrado quando `VITE_FRONTEND_FORGE_API_KEY` está configurada; fallback com link para o Google Maps
-- Endereço e redes sociais reais
+Portal editorial unificado para a **Web Rádio Vitória** (Tupã, SP), integrando:
+- **Transmissão ao vivo** (stream de áudio contínuo)
+- **Podcasts** sob demanda (barra estilo Spotify)
+- **Vídeos/Reels/Stories** recomendados (mini-player flutuante)
+- **Sistema de alertas** de estreia e breaking news com som
+- **Painel administrativo** (anúncios + grade de programação)
+- **Compartilhamento social** (WhatsApp, convites, pedidos de música)
 
 ---
 
-## Rotas
+## 🚀 Quick Start
 
-| Rota | Página |
-|---|---|
-| `/` | Landing institucional da rádio |
-| `/noticias` | Portal de notícias |
-| `/artigo/:id` | Artigo completo |
-| `/contato` | Contato unificado |
-| `/privacy-policy` | Política de Privacidade |
-| `/terms-of-service` | Termos de Serviço |
-| `*` | 404 |
-
----
-
-## Stack
-
-- Vite 5 + React 18 + TypeScript
-- Tailwind CSS 3 + shadcn/ui (Radix)
-- React Router 6 + TanStack Query
-- Vitest (unit) + Playwright (e2e)
-- Fontes: Merriweather / Source Sans 3 (portal) · Playfair Display / Lato (landing)
-
----
-
-## Variáveis de ambiente (arquivo `.env`)
-
-Copie [`.env.example`](./.env.example) para `.env` e preencha:
-
-| Variável | Finalidade |
-|---|---|
-| `VITE_RADIO_STREAM_URL` | URL do stream ao vivo (Icecast/MP3) — libera o botão “Ouvir Agora” |
-| `VITE_CONTACT_ENDPOINT` | Endpoint de envio do formulário (Formspree/WhatsApp API/Webhook) |
-| `VITE_ANALYTICS_ENDPOINT` | Instância Umami (o script só é injetado quando preenchida) |
-| `VITE_ANALYTICS_WEBSITE_ID` | ID do website no Umami |
-| `VITE_FRONTEND_FORGE_API_KEY` | Chave do Google Maps (mapa na página de contato) |
-| `VITE_FRONTEND_FORGE_API_URL` | Proxy do Google Maps (default: `https://forge.butterfly-effect.dev`) |
-| `VITE_OAUTH_PORTAL_URL` / `VITE_APP_ID` | Login OAuth (quando aplicável) |
-
-> ⚠️ **Nunca commitar o `.env`** (já ignorado pelo `.gitignore`).
-
----
-
-## Desenvolvimento
-
-```sh
+```bash
+# Instalar dependências
 npm install
+
+# Desenvolvimento (Vite + HMR)
 npm run dev
-```
 
-Build de produção:
-
-```sh
+# Build de produção
 npm run build
-```
 
-Testes:
-
-```sh
-npm test        # vitest run
+# Preview do build
+npm run preview
 ```
 
 ---
 
-## Pendências que exigem decisão do cliente (valores reais)
+## 🧪 Testes
 
-O código já está pronto e pronto para produção — basta preencher os valores no `.env`:
+```bash
+# Rodar todos os testes (Vitest + Testing Library React)
+npm test
 
-1. **URL do stream ao vivo** → `VITE_RADIO_STREAM_URL` (Icecast/Shoutcast ou MP3) libera o botão “Ouvir Agora”.
-2. **Endpoint do formulário** → `VITE_CONTACT_ENDPOINT` (Formspree/Resend/WhatsApp API). Sem valor, o envio fica em modo demonstração.
-3. **Chave do Google Maps** → `VITE_FRONTEND_FORGE_API_KEY` ativa o mapa em `/contato`.
-4. **Analytics Umami** → `VITE_ANALYTICS_ENDPOINT` + `VITE_ANALYTICS_WEBSITE_ID`.
-5. **Domínio definitivo** — apontar o CNAME/HTTPS público para URIs OAuth.
-6. **Arquivar/desativar** o repositório `landpagewebradiovitoria` (conteúdo 100% unificado e portado aqui).
+# Modo watch (re-executa ao salvar)
+npm run test:watch
+```
+
+### Testes de Alertas (Fase D)
+```bash
+# Rodar apenas testes de alertas (4.1/4.2/4.2a/4.2b)
+npx vitest run src/test/alerts.test.tsx
+```
+
+**Testes cobertos (4/4 verdes):**
+| Teste | Descrição |
+|-------|-----------|
+| **4.1** | "Lembrar-me" de estreia → toast + sino + badge + som discreto 1× |
+| **4.2** | Breaking desktop → tarja vermelha pulsante + som emergência 1× |
+| **4.2a** | Mute global respeitado (player + alertas) |
+| **4.2b** | Breaking mobile → tarja inferior + mute global + som 1× |
 
 ---
 
-Este projeto foi criado com o [Lovable](https://lovable.dev) e continua mantido como repositório único para o domínio público e aprovação de APIs.
+## 📁 Estrutura Principal
+
+```
+src/
+├── components/
+│   ├── RadioPlayer.tsx      # Player unificado (live + podcasts + vídeos)
+│   ├── RadioPlayerBar.tsx   # Barra principal (desktop)
+│   ├── VideoBubble.tsx      # Mini-player flutuante (vídeos/reels)
+│   ├── HomeAlertCenter.tsx  # Central de alertas (Home)
+│   ├── SocialDialogs.tsx    # Comentários, compartilhamento, convites
+│   └── ui/                  # Componentes base (Radix + Tailwind)
+├── pages/
+│   ├── Home.tsx             # Portal editorial (Hero + grade + alertas)
+│   ├── Admin.tsx            # Painel admin (anúncios + grade)
+│   └── ...
+├── lib/
+│   ├── alerts.ts            # Motor de alertas (estreia + breaking)
+│   ├── audio-alert.ts       # Som de alerta (playAlertSound)
+│   ├── schedule.ts          # Grade de programação
+│   └── ...
+├── contexts/
+│   ├── RadioPlayerContext.tsx  # Provider global do player
+│   └── ThemeContext.tsx        # Tema dark/light
+├── hooks/
+│   └── use-mobile.tsx         # Detecção mobile (matchMedia)
+└── test/
+    ├── alerts.test.tsx        # Testes Fase D (4.1/4.2/4.2a/4.2b)
+    └── utils.tsx              # renderWithProviders + RadioPlayerProvider
+```
+
+---
+
+## 🔧 Variáveis de Ambiente
+
+Crie `.env` na raiz (baseado no `.env.example`):
+
+```env
+# Stream da rádio (fallback se não configurado)
+VITE_RADIO_STREAM_URL=https://shoutcast2.s12.com.br:16002/stream
+
+# Supabase (opcional - para dados persistentes)
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+```
+
+---
+
+## 📦 Stack Tecnológico
+
+- **React 18** + **TypeScript** + **Vite 5**
+- **Tailwind CSS** + **Radix UI** (componentes acessíveis)
+- **React Router v6** (roteamento SPA)
+- **TanStack Query** (cache de dados)
+- **Vitest** + **Testing Library React** (testes)
+- **Lucide React** (ícones)
+- **date-fns** (datas/horários)
+
+---
+
+## 📝 Scripts Disponíveis
+
+| Comando | Descrição |
+|---------|-----------|
+| `npm run dev` | Servidor de dev (HMR) |
+| `npm run build` | Build produção (`dist/`) |
+| `npm run preview` | Preview do build |
+| `npm run lint` | ESLint |
+| `npm test` | Testes (Vitest run) |
+| `npm run test:watch` | Testes watch mode |
+
+---
+
+## 📄 Licença
+
+Proprietário — Web Rádio Vitória. Uso interno.

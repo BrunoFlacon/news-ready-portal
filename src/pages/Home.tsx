@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  Bell,
   ChevronDown,
   Crown,
   Heart,
@@ -23,7 +24,10 @@ import { AdSpot, DEFAULT_SKIP_AFTER_MS, type AdCampaign } from "@/components/AdS
 import { Button } from "@/components/ui/button";
 import { InlineComments, SocialBar, SocialRail } from "@/components/SocialDialogs";
 import { trackView, useSocialItem } from "@/lib/social";
-import { addWeekAlert } from "@/lib/alerts";
+import { addWeekAlert, breakingLatest, pendingBreaking, toggleAlertMuted, useAlerts } from "@/lib/alerts";
+import { playAlertSound } from "@/lib/audio-alert";
+const isAudioAvailable = typeof Audio !== "undefined" &&
+  typeof window !== "undefined" && typeof window.Audio !== "undefined";
 import {
   featuredAdCampaigns,
   pickAdCampaign,
@@ -1241,6 +1245,7 @@ export default function Home() {
         onPremiumRequest={openPremium}
         bannerRef={bannerRef}
       />
+      <HomeAlertCenter />
       <VisualCardsRail />
     <ProgrammingSection onPlay={playNow} onPremium={openPremium} />
       <EntertainmentBand onSelectId={selectWatchById} />
@@ -1249,3 +1254,122 @@ export default function Home() {
     </Layout>
   );
 }
+
+/* Export named (Fase D) para testes que importam { Home }. */
+
+/**
+ * Fase D (4.1/4.2) - central de alertas da Home: sino com badge de nao lidos,
+ * toast de "lembrar-me" de estreia e tarja de breaking news. O alerta que
+ * chegar (novo toast/breaking) toca som DISCRETO exatamente UMA vez via
+ * playAlertSound, respeitando o mute global (mutedAlert) e o volume do editor.
+ * Clicar no toast ou na tarja abre o home-alert-player (overlay da materia).
+ */
+function HomeAlertCenter() {
+  const alerts = useAlerts();
+  const [playerOpen, setPlayerOpen] = useState(false);
+  const [activeKind, setActiveKind] = useState<"estreia" | "breaking" | null>(null);
+  const toast = alerts.toasts[0];
+  // Som UMA vez por alerta novo: guard por id do toast/breaking.
+  const lastPlayed = useRef<string | null>(null);
+  useEffect(() => {
+    const key = alerts.breaking ? `b:${alerts.breaking.id}` : toast ? `t:${toast.id}` : null;
+    if (!key || key === lastPlayed.current) {
+      return;
+    }
+    lastPlayed.current = key;
+    isAudioAvailable && playAlertSound({
+      kind: alerts.breaking ? "breaking" : "discreet",
+      volume: alerts.alertVolume,
+      muted: alerts.mutedAlert,
+    });
+  }, [alerts]);
+
+  const openPlayer = () => {
+    setActiveKind(alerts.breaking ? "breaking" : "estreia");
+    setPlayerOpen(true);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        data-testid="home-alert-bell"
+        aria-label="Alertas"
+        onClick={() => setPlayerOpen((v) => !v)}
+        className="relative rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
+      >
+        <Bell className="h-5 w-5" />
+        {alerts.bellUnread > 0 && (
+          <span
+            data-testid="home-alert-badge"
+            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white"
+          >
+            {alerts.bellUnread}
+          </span>
+        )}
+      </button>
+
+      {toast && (
+        <button
+          type="button"
+          data-testid="home-alert-toast"
+          onClick={openPlayer}
+          className="pointer-events-auto fixed bottom-24 right-4 z-[70] flex w-80 max-w-[calc(100vw-2rem)] items-start gap-3 rounded-lg border border-white/10 bg-neutral-950/95 p-3 text-left text-white shadow-2xl"
+        >
+          <span className="grid h-9 w-9 place-items-center rounded-full bg-amber-500/20">
+            <Bell className="h-5 w-5 text-amber-300" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-xs font-semibold text-amber-300">Lembrar-me</span>
+            <span className="block text-sm font-medium">{toast.title}</span>
+            <span className="block text-xs text-neutral-400">A estreia vai começar em instantes</span>
+          </span>
+        </button>
+      )}
+
+      {alerts.breaking && (
+        <button
+          type="button"
+          data-testid="home-breaking-ticker"
+          onClick={openPlayer}
+          className="pointer-events-auto fixed right-0 top-20 z-[70] flex max-w-full items-center gap-2 overflow-hidden border border-red-500/60 bg-red-600 px-3 py-2 text-left text-white shadow-2xl"
+        >
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+          </span>
+          <span className="whitespace-nowrap text-xs font-black uppercase tracking-wide">
+            Urgente — {alerts.breaking.title}
+          </span>
+        </button>
+      )}
+
+      {playerOpen && (
+        <div data-testid="home-alert-player" className="fixed inset-0 z-[80] grid place-items-center bg-black/70 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-neutral-950/95 p-6 text-white shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold">
+                {activeKind === "breaking" ? "Breaking News" : "Estreia na programação"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setPlayerOpen(false)}
+                className="rounded-full bg-white/10 p-1.5 hover:bg-white/20"
+                aria-label="Fechar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {alerts.breaking ? (
+              <p className="text-neutral-300">{alerts.breaking.body}</p>
+            ) : (
+              <p className="text-neutral-300">{toast?.body ?? "Acompanhe ao vivo na Web Rádio Vitória."}</p>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+export { Home };

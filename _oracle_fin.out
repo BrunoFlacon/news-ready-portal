@@ -1,0 +1,33 @@
+
+ RUN  v3.2.7 C:/wamp64/www/news-ready-portal/opencode/news-ready-portal
+
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/test/alerts.test.tsx [ src/test/alerts.test.tsx ]
+Error:   x Expected ';', '}' or <eof>
+     ,-[C:/wamp64/www/news-ready-portal/opencode/news-ready-portal/src/components/RadioPlayer.tsx:903:1]
+ 900 |     // Fase D (4.2b): standalone/mobile sem player ativo ainda expoe a
+ 901 |     // central de alertas (tarja breaking + mute global) na borda inferior.
+ 902 |     return <RadioAlertShell standalone />;
+ 903 |   }mobile + mute global) segue ativa.
+     :    ^^^^^^|^^^^^^ ^^^^^^
+     :          `-- This is the expression part of an expression statement
+ 904 |     return <RadioAlertShell />;
+ 905 |   }
+     `----
+
+
+Caused by:
+    Syntax Error
+  Plugin: vite:react-swc
+  File: C:/wamp64/www/news-ready-portal/opencode/news-ready-portal/src/components/RadioPlayer.tsx
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  21:24:39
+   Duration  2.58s (transform 97ms, setup 211ms, collect 0ms, tests 0ms, environment 1.08s, prepare 187ms)
+

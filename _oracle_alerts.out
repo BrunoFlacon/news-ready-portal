@@ -1,0 +1,14 @@
+file:///C:/wamp64/www/news-ready-portal/opencode/news-ready-portal/node_modules/vitest/dist/chunks/cac.BfaZ95xE.js:404
+          throw new CACError(`Unknown option \`${name.length > 1 ? `--${name}` : `-${name}`}\``);
+                ^
+
+CACError: Unknown option `--prompt`
+    at Command.checkUnknownOptions (file:///C:/wamp64/www/news-ready-portal/opencode/news-ready-portal/node_modules/vitest/dist/chunks/cac.BfaZ95xE.js:404:17)
+    at CAC.runMatchedCommand (file:///C:/wamp64/www/news-ready-portal/opencode/news-ready-portal/node_modules/vitest/dist/chunks/cac.BfaZ95xE.js:604:13)
+    at CAC.parse (file:///C:/wamp64/www/news-ready-portal/opencode/news-ready-portal/node_modules/vitest/dist/chunks/cac.BfaZ95xE.js:545:12)
+    at file:///C:/wamp64/www/news-ready-portal/opencode/news-ready-portal/node_modules/vitest/dist/cli.js:27:13
+    at ModuleJob.run (node:internal/modules/esm/module_job:345:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v22.20.0
